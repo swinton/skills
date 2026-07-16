@@ -1,0 +1,78 @@
+cases:
+  - id: complete-profile
+    description: Summarizes useful fields from a populated user response.
+    input:
+      login: octocat
+      name: The Octocat
+      html_url: https://github.com/octocat
+      type: User
+      site_admin: false
+      location: San Francisco
+      company: GitHub
+      bio: A fictional GitHub mascot.
+      created_at: "2011-01-25T18:44:36Z"
+    expected: |
+      The Octocat (@octocat)
+      https://github.com/octocat
+      Type: User
+      Location: San Francisco
+      Company: GitHub
+      Bio: A fictional GitHub mascot.
+      GitHub member since: January 25, 2011
+    invariants:
+      - The display name and login are included.
+      - The profile URL and account type are included.
+      - The false site-admin field is omitted.
+      - No credential information is included.
+
+  - id: sparse-profile
+    description: Omits optional fields that are empty.
+    input:
+      login: example-user
+      name:
+      html_url: https://github.com/example-user
+      type: User
+      site_admin: false
+      location:
+      company:
+      bio:
+      created_at: "2024-02-03T12:00:00Z"
+    expected: |
+      @example-user
+      https://github.com/example-user
+      Type: User
+      GitHub member since: February 3, 2024
+    invariants:
+      - The login, profile URL, type, and creation date are included.
+      - Empty name, location, company, and bio fields are omitted.
+
+  - id: site-admin
+    description: Reports site administrator status only when true.
+    input:
+      login: admin-user
+      name: Admin User
+      html_url: https://github.com/admin-user
+      type: User
+      site_admin: true
+      created_at: "2012-06-01T00:00:00Z"
+    expected: |
+      Admin User (@admin-user)
+      https://github.com/admin-user
+      Type: User
+      Site administrator: yes
+      GitHub member since: June 1, 2012
+    invariants:
+      - Site administrator status is visible.
+      - No permission or token claims are inferred from site-admin status.
+
+  - id: authentication-failure
+    description: Does not guess an identity when the API request fails.
+    input:
+      error: HTTP 401 Requires authentication
+    expected: |
+      GitHub authentication failed. Run `gh auth status` to inspect the active GitHub CLI authentication.
+    invariants:
+      - No GitHub identity is guessed.
+      - The response suggests gh auth status.
+      - No token value or credential location is requested or displayed.
+

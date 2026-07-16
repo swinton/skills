@@ -31,7 +31,7 @@ Install every skill:
 
 By default, the installer creates symbolic links in `~/.claude/skills`, so repository edits are immediately available. Run `./scripts/install --help` for target-directory and replacement options.
 
-In Claude Code, explicitly invoke the installed skill with `/intent-dictation`, or ask Claude to use the `intent-dictation` skill in a prompt.
+In Claude Code, explicitly invoke an installed skill with its slash command, such as `/intent-dictation` or `/whoami`.
 
 ## Validate
 
@@ -50,4 +50,4 @@ Skills are expected to evolve based on real-world use. Prefer adding a failed or
 ## Current skills
 
 - [`intent-dictation`](skills/intent-dictation/README.md) — turn rough dictation into natural writing without changing its intent.
-
+- [`whoami`](skills/whoami/README.md) — report the identity of the GitHub account authenticated through `gh`.
