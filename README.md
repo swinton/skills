@@ -71,6 +71,20 @@ printf '%s\n' '/whoami' | claude -p
 
 Run non-interactive commands from a directory you trust. Skills that use external tools still require those tools, authentication, network access, and any applicable Claude Code permissions.
 
+## Keep skill surfaces in sync
+
+Claude Code reads installed skills directly from disk. Personal skills in Claude Chat and Cowork share an account-level list but require a manual ZIP upload through Customize > Skills. The optional workspace Skills API is a third, independent target.
+
+```sh
+uv run sync_skills.py status
+uv run sync_skills.py bundle [skill-name]
+uv run sync_skills.py mark-synced <skill-name>
+uv run sync_skills.py mark-synced --all
+uv run sync_skills.py push-api [skill-name]
+```
+
+`status` compares each canonical skill with the last manually recorded claude.ai upload. `bundle` creates upload-ready ZIPs in `dist/`; after uploading them, use `mark-synced`. `push-api` requires `ANTHROPIC_API_KEY` and targets only the separate workspace-level Skills API—it cannot update personal claude.ai skills.
+
 ## Validate
 
 ```sh

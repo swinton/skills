@@ -137,3 +137,9 @@ if [ "$INSTALL_ALL" = true ]; then
 else
   install_skill "$SKILL_NAME"
 fi
+
+if command -v uv >/dev/null 2>&1; then
+  uv run "$REPO_ROOT/sync_skills.py" --skills-dir "$TARGET_DIR" status || true
+else
+  echo "warning: uv not found; skipping skill drift status" >&2
+fi
