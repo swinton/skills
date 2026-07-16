@@ -125,18 +125,7 @@ jobs:
         if: always()
         run: |
           if test -f artifacts/evals.json; then
-            python3 -c '
-            import json, sys
-
-            summary = json.load(open(sys.argv[1]))
-            print("## Skill evals")
-            print()
-            print("- Model: `{}`".format(summary["model"]))
-            print("- Passed: {}/{}".format(summary["passed"], summary["total"]))
-            print("- Blocking failures: {}".format(summary["blocking_failures"]))
-            print("- Infrastructure failures: {}".format(summary["infrastructure_failures"]))
-            print("- Passed after retry: {}".format(summary["flaky"]))
-            ' artifacts/evals.json >> "$GITHUB_STEP_SUMMARY"
+            ./scripts/eval --markdown-summary artifacts/evals.json >> "$GITHUB_STEP_SUMMARY"
           fi
       - uses: actions/upload-artifact@v4
         if: always() && steps.selection.outputs.should_run == 'true'

@@ -38,6 +38,11 @@ def parse_args() -> argparse.Namespace:
     selection = parser.add_mutually_exclusive_group(required=True)
     selection.add_argument("--all", action="store_true", help="Evaluate every skill")
     selection.add_argument("--skill", metavar="NAME", help="Evaluate one skill")
+    selection.add_argument(
+        "--markdown-summary",
+        metavar="PATH",
+        help="Print a Markdown summary from evaluator JSON",
+    )
     parser.add_argument("--case", dest="case_id", metavar="ID", help="Evaluate one case ID")
     parser.add_argument(
         "--changed-since",
@@ -238,8 +243,22 @@ def write_junit(path: str, summary: dict[str, Any]) -> None:
         file.write("\n")
 
 
+def print_markdown_summary(path: str) -> None:
+    summary = json.loads(Path(path).read_text())
+    print("## Skill evals")
+    print()
+    print(f"- Model: `{summary['model']}`")
+    print(f"- Passed: {summary['passed']}/{summary['total']}")
+    print(f"- Blocking failures: {summary['blocking_failures']}")
+    print(f"- Infrastructure failures: {summary['infrastructure_failures']}")
+    print(f"- Passed after retry: {summary['flaky']}")
+
+
 def main() -> int:
     args = parse_args()
+    if args.markdown_summary:
+        print_markdown_summary(args.markdown_summary)
+        return 0
     skills = (
         changed_skills(args.changed_since)
         if args.changed_since

@@ -85,6 +85,9 @@ printf '%s\n' "$docs" | grep -q '0 case(s)'
 CLAUDE_BIN="$FAKE" "$ROOT/scripts/eval" --skill whoami --case sparse-profile --output "$TMPDIR_ROOT/pass.json" --junit "$TMPDIR_ROOT/pass.xml" >/dev/null
 python3 -c 'import json,sys; s=json.load(open(sys.argv[1])); assert s["passed"] == 1 and s["blocking_failures"] == 0' "$TMPDIR_ROOT/pass.json"
 grep -q '<testsuite name="skill-evals" tests="1" failures="0">' "$TMPDIR_ROOT/pass.xml"
+summary=$("$ROOT/scripts/eval" --markdown-summary "$TMPDIR_ROOT/pass.json")
+printf '%s\n' "$summary" | grep -q '^## Skill evals$'
+printf '%s\n' "$summary" | grep -q '^- Passed: 1/1$'
 
 FAKE_MODE=retry FAKE_STATE="$STATE" CLAUDE_BIN="$FAKE" "$ROOT/scripts/eval" --skill whoami --case sparse-profile --output "$TMPDIR_ROOT/retry.json" >/dev/null
 python3 -c 'import json,sys; s=json.load(open(sys.argv[1])); assert s["flaky"] == 1 and s["blocking_failures"] == 0' "$TMPDIR_ROOT/retry.json"
