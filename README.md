@@ -92,4 +92,5 @@ Experimental skills are deliberately easy to try but excluded from `./scripts/in
 ## Current skills
 
 - [`intent-dictation`](skills/intent-dictation/README.md) — turn rough dictation into natural writing without changing its intent.
+- [`schedule-meeting`](skills/schedule-meeting/README.md) **(experimental)** — interview for meeting details, check required-attendee availability, and propose bookable slots.
 - [`whoami`](skills/whoami/README.md) — report the identity of the GitHub account authenticated through `gh`.
