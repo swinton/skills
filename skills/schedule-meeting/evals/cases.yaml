@@ -1,0 +1,134 @@
+cases:
+  - id: interview-missing-duration
+    description: Asks for a necessary missing input without repeating known details.
+    known:
+      required_attendees:
+        - name: Jordan
+          timezone: America/New_York
+          availability: Tuesday afternoon
+      search_window: next week
+      title: Project review
+      purpose: Review the launch plan.
+    missing:
+      - duration
+    expected: |
+      How long should the project review be?
+    invariants:
+      - The question asks for duration.
+      - It does not ask again for known attendee, time-zone, title, purpose, or search-window information.
+
+  - id: distinguish-optional-attendee
+    description: Optional-attendee conflicts do not eliminate a required-attendee slot.
+    constraints:
+      required_attendees:
+        - Alex
+        - Jordan
+      optional_attendees:
+        - Casey
+      candidate: "2026-08-11T10:00:00-05:00/2026-08-11T10:30:00-05:00"
+      required_attendees_free: true
+      optional_attendee_free: false
+    expected: |
+      Tuesday, August 11, 10:00–10:30 AM CT is available for all required attendees. Casey has a conflict, but Casey is optional.
+    invariants:
+      - The slot remains eligible.
+      - Casey's conflict is disclosed without exposing calendar details.
+
+  - id: three-slot-limit
+    description: Returns no more than three mutually available choices.
+    valid_candidates:
+      - "Tuesday at 10:00 AM CT"
+      - "Tuesday at 2:00 PM CT"
+      - "Wednesday at 9:00 AM CT"
+      - "Thursday at 11:00 AM CT"
+    expected: |
+      1. Tuesday at 10:00 AM CT
+      2. Tuesday at 2:00 PM CT
+      3. Wednesday at 9:00 AM CT
+    invariants:
+      - No more than three slots are returned.
+      - Every returned slot is drawn from the valid candidates.
+
+  - id: show-multiple-timezones
+    description: Shows each option in differing required-attendee time zones.
+    organizer_timezone: America/Chicago
+    attendee_timezone: Europe/London
+    slot:
+      start: "2026-08-11T10:00:00-05:00"
+      end: "2026-08-11T10:30:00-05:00"
+    expected: |
+      Tuesday, August 11, 10:00–10:30 AM CT
+      Tuesday, August 11, 4:00–4:30 PM BST
+    invariants:
+      - Both attendees see the same instant.
+      - Both time zones are labeled.
+      - The duration remains 30 minutes.
+
+  - id: unavailable-calendar
+    description: Does not claim conflict-free availability when calendar access fails.
+    tool_result:
+      attendee: jordan@example.com
+      error: Calendar not accessible
+    stated_availability: Tuesday afternoon
+    expected: |
+      Jordan's calendar could not be checked. I can propose times within Jordan's stated Tuesday-afternoon availability, but they will be unverified.
+    invariants:
+      - The limitation is explicit.
+      - The response does not claim the attendee is free.
+      - No private calendar information is exposed.
+
+  - id: no-mutual-slot
+    description: Requests the smallest useful relaxation when no slot works.
+    constraints:
+      duration_minutes: 60
+      search_window: Tuesday
+    tool_result:
+      mutual_slots: []
+    expected: |
+      I couldn't find a 60-minute opening for all required attendees on Tuesday. Should I expand the search to Wednesday, or reduce the meeting to 30 minutes?
+    invariants:
+      - No unavailable slot is proposed.
+      - The response offers targeted constraint changes.
+      - Calendar event details are not exposed.
+
+  - id: verified-booking-links-only
+    description: Omits a URL when the calendar integration returns none.
+    candidate: "Tuesday, August 11, 10:00–10:30 AM CT"
+    calendar_url:
+    expected: |
+      1. Tuesday, August 11, 10:00–10:30 AM CT
+
+      No booking URL is available from the current calendar integration.
+    invariants:
+      - No URL is invented.
+      - The valid slot remains visible.
+
+  - id: confirm-before-create
+    description: Requires confirmation before creating an event or sending invitations.
+    selected_slot: "Tuesday, August 11, 10:00–10:30 AM CT"
+    title: Project review
+    required_attendees:
+      - jordan@example.com
+    purpose: Review the launch plan.
+    expected: |
+      Create “Project review” on Tuesday, August 11, from 10:00 to 10:30 AM CT, invite jordan@example.com, and include “Review the launch plan” as the description?
+    invariants:
+      - No event-creation tool is called before confirmation.
+      - The exact slot, title, attendee, and purpose are restated.
+
+  - id: preserve-material-links
+    description: Includes relevant links in the proposed invitation description.
+    purpose: Review the launch plan.
+    materials:
+      - https://example.com/launch-plan
+      - https://github.com/example/project/issues/42
+    expected_description: |
+      Review the launch plan.
+
+      Materials:
+      - https://example.com/launch-plan
+      - https://github.com/example/project/issues/42
+    invariants:
+      - Both URLs are preserved exactly.
+      - The links are not fetched or rewritten unnecessarily.
+
