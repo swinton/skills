@@ -1,105 +1,132 @@
-#!/bin/sh
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.10"
+# dependencies = [
+#     "PyYAML==6.0.2",
+# ]
+# ///
+"""Validate repository skill structure and evaluation cases."""
 
-set -eu
+from __future__ import annotations
 
-SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-REPO_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
-SKILLS_DIR="$REPO_ROOT/skills"
-errors=0
+import re
+from pathlib import Path
+from typing import Any
 
-fail() {
-  echo "error: $*" >&2
-  errors=$((errors + 1))
-}
+import yaml
 
-if [ ! -d "$SKILLS_DIR" ]; then
-  echo "error: missing skills directory: $SKILLS_DIR" >&2
-  exit 1
-fi
 
-if ! command -v ruby >/dev/null 2>&1; then
-  echo "error: Ruby is required for YAML validation and is included with supported macOS versions" >&2
-  exit 1
-fi
+ROOT = Path(__file__).resolve().parent.parent
+SKILLS_DIR = ROOT / "skills"
+SKILL_NAME = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+CASE_ID = SKILL_NAME
 
-found=false
-for path in "$SKILLS_DIR"/*; do
-  [ -e "$path" ] || continue
-  found=true
 
-  if [ ! -d "$path" ]; then
-    fail "every immediate child of skills/ must be a directory: $path"
-    continue
-  fi
+def load_yaml(text: str) -> Any:
+    return yaml.safe_load(text)
 
-  name=$(basename "$path")
-  case "$name" in
-    *[!a-z0-9-]*|-*|*-|*--*|"")
-      fail "invalid skill name '$name'; use lowercase kebab-case"
-      ;;
-  esac
 
-  [ -s "$path/SKILL.md" ] || fail "$name: missing or empty SKILL.md"
-  [ -f "$path/README.md" ] || fail "$name: missing README.md"
-  if [ -e "$path/EXPERIMENTAL.md" ] && { [ ! -f "$path/EXPERIMENTAL.md" ] || [ ! -s "$path/EXPERIMENTAL.md" ]; }; then
-    fail "$name: EXPERIMENTAL.md must be a non-empty file"
-  fi
+def validate_frontmatter(path: Path, expected_name: str) -> None:
+    text = path.read_text()
+    if not text.startswith("---\n"):
+        raise ValueError("missing YAML frontmatter")
+    closing = text.find("\n---\n", 4)
+    if closing < 0:
+        raise ValueError("unterminated YAML frontmatter")
+    metadata = load_yaml(text[4:closing])
+    if not isinstance(metadata, dict):
+        raise ValueError("frontmatter must be a mapping")
+    if metadata.get("name") != expected_name:
+        raise ValueError("metadata name does not match directory name")
 
-  if [ -s "$path/SKILL.md" ]; then
-    if ! ruby -ryaml -e '
-      file, expected = ARGV
-      text = File.read(file)
-      abort "missing YAML frontmatter" unless text.start_with?("---\n")
-      closing = text.index("\n---\n", 4)
-      abort "unterminated YAML frontmatter" unless closing
-      metadata = YAML.safe_load(text[4...closing], permitted_classes: [], aliases: false)
-      abort "frontmatter must be a mapping" unless metadata.is_a?(Hash)
-      name = metadata["name"]
-      abort "metadata name is missing" unless name
-      abort "metadata name #{name.inspect} does not match #{expected.inspect}" unless name == expected
-    ' "$path/SKILL.md" "$name" 2>/dev/null; then
-      fail "$name: invalid SKILL.md frontmatter or mismatched metadata name"
-    fi
-  fi
 
-  if [ -d "$path/evals" ]; then
-    for yaml in "$path"/evals/*.yaml "$path"/evals/*.yml; do
-      [ -f "$yaml" ] || continue
-      if ! ruby -ryaml -e '
-        file = ARGV.fetch(0)
-        document = YAML.safe_load(File.read(file), permitted_classes: [], aliases: false)
-        abort "document must be a mapping" unless document.is_a?(Hash)
-        cases = document["cases"]
-        abort "cases must be a non-empty list" unless cases.is_a?(Array) && !cases.empty?
-        ids = {}
-        cases.each_with_index do |entry, index|
-          abort "case #{index + 1} must be a mapping" unless entry.is_a?(Hash)
-          %w[id description prompt expected invariants].each do |key|
-            value = entry[key]
-            abort "case #{index + 1}: missing #{key}" if value.nil?
-            abort "case #{index + 1}: empty #{key}" if value.respond_to?(:empty?) && value.empty?
-          end
-          abort "case #{index + 1}: invariants must be a non-empty list of strings" unless
-            entry["invariants"].is_a?(Array) &&
-            entry["invariants"].all? { |item| item.is_a?(String) && !item.empty? }
-          id = entry["id"]
-          abort "case #{index + 1}: id must use lowercase kebab-case" unless
-            id.is_a?(String) && id.match?(/\A[a-z0-9]+(?:-[a-z0-9]+)*\z/)
-          abort "duplicate case id #{id.inspect}" if ids[id]
-          ids[id] = true
-        end
-      ' "$yaml" 2>/dev/null; then
-        fail "$name: invalid evaluation schema in ${yaml#$REPO_ROOT/}"
-      fi
-    done
-  fi
-done
+def validate_cases(path: Path) -> None:
+    document = load_yaml(path.read_text())
+    if not isinstance(document, dict):
+        raise ValueError("document must be a mapping")
+    cases = document.get("cases")
+    if not isinstance(cases, list) or not cases:
+        raise ValueError("cases must be a non-empty list")
+    seen: set[str] = set()
+    required = ("id", "description", "prompt", "expected", "invariants")
+    for index, case in enumerate(cases, start=1):
+        if not isinstance(case, dict):
+            raise ValueError(f"case {index} must be a mapping")
+        for key in required:
+            value = case.get(key)
+            if value is None:
+                raise ValueError(f"case {index}: missing {key}")
+            if hasattr(value, "__len__") and len(value) == 0:
+                raise ValueError(f"case {index}: empty {key}")
+        invariants = case["invariants"]
+        if not isinstance(invariants, list) or not invariants or not all(
+            isinstance(item, str) and item for item in invariants
+        ):
+            raise ValueError(
+                f"case {index}: invariants must be a non-empty list of strings"
+            )
+        case_id = case["id"]
+        if not isinstance(case_id, str) or not CASE_ID.fullmatch(case_id):
+            raise ValueError(f"case {index}: id must use lowercase kebab-case")
+        if case_id in seen:
+            raise ValueError(f"duplicate case id {case_id!r}")
+        seen.add(case_id)
 
-[ "$found" = true ] || fail "no skills found"
 
-if [ "$errors" -ne 0 ]; then
-  echo "validation failed with $errors error(s)" >&2
-  exit 1
-fi
+def main() -> int:
+    if not SKILLS_DIR.is_dir():
+        print(f"error: missing skills directory: {SKILLS_DIR}")
+        return 1
 
-echo "validation passed"
+    errors: list[str] = []
+    paths = sorted(SKILLS_DIR.iterdir())
+    if not paths:
+        errors.append("no skills found")
+
+    for path in paths:
+        if not path.is_dir():
+            errors.append(f"every immediate child of skills/ must be a directory: {path}")
+            continue
+        name = path.name
+        if not SKILL_NAME.fullmatch(name):
+            errors.append(f"invalid skill name {name!r}; use lowercase kebab-case")
+
+        skill_file = path / "SKILL.md"
+        if not skill_file.is_file() or not skill_file.stat().st_size:
+            errors.append(f"{name}: missing or empty SKILL.md")
+        else:
+            try:
+                validate_frontmatter(skill_file, name)
+            except (OSError, UnicodeError, ValueError, yaml.YAMLError):
+                errors.append(
+                    f"{name}: invalid SKILL.md frontmatter or mismatched metadata name"
+                )
+
+        if not (path / "README.md").is_file():
+            errors.append(f"{name}: missing README.md")
+        experimental = path / "EXPERIMENTAL.md"
+        if experimental.exists() and (
+            not experimental.is_file() or not experimental.stat().st_size
+        ):
+            errors.append(f"{name}: EXPERIMENTAL.md must be a non-empty file")
+
+        evals = path / "evals"
+        if evals.is_dir():
+            for case_file in sorted((*evals.glob("*.yaml"), *evals.glob("*.yml"))):
+                try:
+                    validate_cases(case_file)
+                except (OSError, UnicodeError, ValueError, yaml.YAMLError):
+                    relative = case_file.relative_to(ROOT)
+                    errors.append(f"{name}: invalid evaluation schema in {relative}")
+
+    if errors:
+        for error in errors:
+            print(f"error: {error}")
+        print(f"validation failed with {len(errors)} error(s)")
+        return 1
+    print("validation passed")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

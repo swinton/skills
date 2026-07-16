@@ -94,7 +94,7 @@ uv run sync_skills.py push-api [skill-name]
 ./scripts/validate
 ```
 
-Validation checks skill names, required files, frontmatter names, and the evaluation-case schema using Ruby's standard YAML library.
+Validation checks skill names, required files, frontmatter names, and the evaluation-case schema using Python and PyYAML.
 
 Run every behavioral evaluation:
 

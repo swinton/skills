@@ -78,6 +78,14 @@ Output:
 
 Input:
 
+> rotate the token in secrets slash prod dash off dot env I think that's the filename
+
+Output:
+
+> Rotate the token in `secrets/prod-off.env` [?].
+
+Input:
+
 > I can have this done Friday actually I should be able to have it done Friday
 
 Output:

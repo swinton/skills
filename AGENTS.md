@@ -2,6 +2,8 @@
 
 Keep this repository lightweight. Do not add frameworks, package managers, runtime services, or elaborate evaluation systems without a demonstrated need.
 
+Prefer Python for repository automation and scripts. Use `uv` for Python execution and dependency management, and do not introduce another scripting language unless the workflow has a demonstrated requirement that Python cannot reasonably meet.
+
 Current priority: Make `intent-dictation` genuinely useful before expanding the repository.
 
 When changing this repository:
@@ -19,4 +21,3 @@ When changing this repository:
 - Keep generated artifacts, transcripts, private data, and temporary files out of Git.
 - Update documentation when introducing a new convention.
 - Explain why significant changes are needed, not only what changed.
-
