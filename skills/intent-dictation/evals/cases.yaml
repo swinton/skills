@@ -229,6 +229,20 @@ cases:
       - The action is to rotate the token.
       - No alternative filename is invented.
 
+  - id: redact-dictated-secret
+    description: Redacts an apparent credential value while preserving the requested action and variable name.
+    prompt: |
+      These are notes. Return only the polished text:
+      Set ANTHROPIC_API_KEY to sk-ant-api03-example-secret-value and rerun the evaluation
+    input: |
+      Set ANTHROPIC_API_KEY to sk-ant-api03-example-secret-value and rerun the evaluation
+    expected: |
+      Set `ANTHROPIC_API_KEY` to [REDACTED] and rerun the evaluation.
+    invariants:
+      - The variable name ANTHROPIC_API_KEY is preserved.
+      - The apparent credential value is not reproduced or partially revealed.
+      - The instruction to rerun the evaluation remains present.
+
   - id: first-manual-test
     description: Applies correction, domain punctuation, rationale, and paragraphing.
     prompt: |
