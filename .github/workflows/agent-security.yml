@@ -93,11 +93,21 @@ jobs:
           SKILL_PATHS: ${{ steps.selection.outputs.paths }}
         run: |
           mapfile -t skills <<< "$SKILL_PATHS"
-          uvx --from snyk-agent-scan==0.5.15 snyk-agent-scan \
-            --ci \
-            --dangerously-run-mcp-servers \
-            --json \
-            "${skills[@]}" | tee agent-scan.json
+          mkdir -p agent-scan-results
+          status=0
+          for skill in "${skills[@]}"; do
+            name=${skill#skills/}
+            echo "::group::Scanning $skill"
+            if ! uvx --from snyk-agent-scan==0.5.15 snyk-agent-scan \
+              --ci \
+              --dangerously-run-mcp-servers \
+              --json \
+              "$skill" | tee "agent-scan-results/$name.json"; then
+              status=1
+            fi
+            echo "::endgroup::"
+          done
+          exit "$status"
       - name: Write scan summary
         if: always() && steps.selection.outputs.count != '0' && env.SNYK_TOKEN != ''
         run: |
@@ -109,7 +119,7 @@ jobs:
             echo "This is a best-effort scan for known malicious and risky patterns, not a certification of safety."
           } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
-        if: always() && hashFiles('agent-scan.json') != ''
+        if: always() && hashFiles('agent-scan-results/*.json') != ''
         with:
           name: agent-scan-results
-          path: agent-scan.json
+          path: agent-scan-results/
