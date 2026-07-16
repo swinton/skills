@@ -44,7 +44,7 @@ else
   }
   result='Candidate response'
 fi
-printf '{"result":%s}\n' "$(printf '%s' "$result" | ruby -rjson -e 'puts JSON.generate(STDIN.read)')"
+printf '{"result":%s}\n' "$(printf '%s' "$result" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')"
 EOF
 chmod +x "$FAKE"
 
@@ -83,11 +83,11 @@ docs=$(FAKE_GIT_MODE=docs GIT_BIN="$FAKE_GIT" "$ROOT/scripts/eval" --all --chang
 printf '%s\n' "$docs" | grep -q '0 case(s)'
 
 CLAUDE_BIN="$FAKE" "$ROOT/scripts/eval" --skill whoami --case sparse-profile --output "$TMPDIR_ROOT/pass.json" --junit "$TMPDIR_ROOT/pass.xml" >/dev/null
-ruby -rjson -e 's=JSON.parse(File.read(ARGV[0])); abort unless s["passed"] == 1 && s["blocking_failures"] == 0' "$TMPDIR_ROOT/pass.json"
+python3 -c 'import json,sys; s=json.load(open(sys.argv[1])); assert s["passed"] == 1 and s["blocking_failures"] == 0' "$TMPDIR_ROOT/pass.json"
 grep -q '<testsuite name="skill-evals" tests="1" failures="0">' "$TMPDIR_ROOT/pass.xml"
 
 FAKE_MODE=retry FAKE_STATE="$STATE" CLAUDE_BIN="$FAKE" "$ROOT/scripts/eval" --skill whoami --case sparse-profile --output "$TMPDIR_ROOT/retry.json" >/dev/null
-ruby -rjson -e 's=JSON.parse(File.read(ARGV[0])); abort unless s["flaky"] == 1 && s["blocking_failures"] == 0' "$TMPDIR_ROOT/retry.json"
+python3 -c 'import json,sys; s=json.load(open(sys.argv[1])); assert s["flaky"] == 1 and s["blocking_failures"] == 0' "$TMPDIR_ROOT/retry.json"
 
 if FAKE_MODE=fail CLAUDE_BIN="$FAKE" "$ROOT/scripts/eval" --skill whoami --case sparse-profile >/dev/null; then
   echo "error: stable failure did not block" >&2

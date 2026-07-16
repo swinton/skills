@@ -35,6 +35,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
       - name: Validate repository
         run: ./scripts/validate
       - name: Test sync utility
@@ -62,6 +63,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - uses: astral-sh/setup-uv@v6
       - name: Select affected skill evaluations
         id: selection
         shell: bash
@@ -123,15 +125,17 @@ jobs:
         if: always()
         run: |
           if test -f artifacts/evals.json; then
-            ruby -rjson -e '
-              summary = JSON.parse(File.read(ARGV.fetch(0)))
-              puts "## Skill evals"
-              puts
-              puts "- Model: `#{summary["model"]}`"
-              puts "- Passed: #{summary["passed"]}/#{summary["total"]}"
-              puts "- Blocking failures: #{summary["blocking_failures"]}"
-              puts "- Infrastructure failures: #{summary["infrastructure_failures"]}"
-              puts "- Passed after retry: #{summary["flaky"]}"
+            python3 -c '
+            import json, sys
+
+            summary = json.load(open(sys.argv[1]))
+            print("## Skill evals")
+            print()
+            print("- Model: `{}`".format(summary["model"]))
+            print("- Passed: {}/{}".format(summary["passed"], summary["total"]))
+            print("- Blocking failures: {}".format(summary["blocking_failures"]))
+            print("- Infrastructure failures: {}".format(summary["infrastructure_failures"]))
+            print("- Passed after retry: {}".format(summary["flaky"]))
             ' artifacts/evals.json >> "$GITHUB_STEP_SUMMARY"
           fi
       - uses: actions/upload-artifact@v4
