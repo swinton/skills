@@ -1,6 +1,8 @@
 cases:
   - id: interview-missing-duration
     description: Asks for a necessary missing input without repeating known details.
+    prompt: |
+      Arrange a project review next week with Jordan, who is required, in America/New_York, and available Tuesday afternoon. The purpose is to review the launch plan. Continue the interview.
     known:
       required_attendees:
         - name: Jordan
@@ -19,6 +21,8 @@ cases:
 
   - id: distinguish-optional-attendee
     description: Optional-attendee conflicts do not eliminate a required-attendee slot.
+    prompt: |
+      Alex and Jordan are required attendees and are free Tuesday, August 11, 2026 from 10:00–10:30 AM CT. Casey is optional and has a conflict. Present this candidate without exposing calendar details.
     constraints:
       required_attendees:
         - Alex
@@ -36,6 +40,8 @@ cases:
 
   - id: three-slot-limit
     description: Returns no more than three mutually available choices.
+    prompt: |
+      The valid mutually available candidates are Tuesday at 10:00 AM CT, Tuesday at 2:00 PM CT, Wednesday at 9:00 AM CT, and Thursday at 11:00 AM CT. Propose the allowed number of choices.
     valid_candidates:
       - "Tuesday at 10:00 AM CT"
       - "Tuesday at 2:00 PM CT"
@@ -51,6 +57,8 @@ cases:
 
   - id: show-multiple-timezones
     description: Shows each option in differing required-attendee time zones.
+    prompt: |
+      Present the 30-minute slot beginning 2026-08-11T10:00:00-05:00 for an organizer in America/Chicago and a required attendee in Europe/London.
     organizer_timezone: America/Chicago
     attendee_timezone: Europe/London
     slot:
@@ -66,6 +74,8 @@ cases:
 
   - id: unavailable-calendar
     description: Does not claim conflict-free availability when calendar access fails.
+    prompt: |
+      Jordan stated availability Tuesday afternoon, but jordan@example.com's calendar returned "Calendar not accessible." Explain what can be proposed.
     tool_result:
       attendee: jordan@example.com
       error: Calendar not accessible
@@ -79,6 +89,8 @@ cases:
 
   - id: no-mutual-slot
     description: Requests the smallest useful relaxation when no slot works.
+    prompt: |
+      No mutual slot exists for a 60-minute meeting on Tuesday. Continue the scheduling interview with the smallest useful relaxation.
     constraints:
       duration_minutes: 60
       search_window: Tuesday
@@ -93,6 +105,8 @@ cases:
 
   - id: verified-booking-links-only
     description: Omits a URL when the calendar integration returns none.
+    prompt: |
+      Propose Tuesday, August 11, 10:00–10:30 AM CT. The calendar integration returned no booking URL.
     candidate: "Tuesday, August 11, 10:00–10:30 AM CT"
     calendar_url:
     expected: |
@@ -105,6 +119,8 @@ cases:
 
   - id: confirm-before-create
     description: Requires confirmation before creating an event or sending invitations.
+    prompt: |
+      The user selected Tuesday, August 11, 10:00–10:30 AM CT for "Project review" with required attendee jordan@example.com. The purpose is "Review the launch plan." Take the next step without creating anything yet.
     selected_slot: "Tuesday, August 11, 10:00–10:30 AM CT"
     title: Project review
     required_attendees:
@@ -118,11 +134,13 @@ cases:
 
   - id: preserve-material-links
     description: Includes relevant links in the proposed invitation description.
+    prompt: |
+      Prepare the invitation description for "Review the launch plan." Include these materials exactly: https://example.com/launch-plan and https://github.com/example/project/issues/42
     purpose: Review the launch plan.
     materials:
       - https://example.com/launch-plan
       - https://github.com/example/project/issues/42
-    expected_description: |
+    expected: |
       Review the launch plan.
 
       Materials:
@@ -131,4 +149,3 @@ cases:
     invariants:
       - Both URLs are preserved exactly.
       - The links are not fetched or rewritten unnecessarily.
-

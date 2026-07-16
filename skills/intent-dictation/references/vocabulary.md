@@ -1,6 +1,6 @@
 # Vocabulary
 
-These are recurring terms to preserve when they appear in dictation, not a complete glossary. Do not replace them with more common-looking words without strong contextual evidence.
+These are recurring terms to preserve when they appear in dictation, not a complete glossary. Treat each listed form as its canonical spelling and capitalization, including when dictation supplies a case-insensitive spoken match such as “unified test” for “Unified Test.” Do not replace these terms with more common-looking words without strong contextual evidence.
 
 - Lobot
 - Tailscale
@@ -25,4 +25,3 @@ These are recurring terms to preserve when they appear in dictation, not a compl
 - Immich
 - Wispr
 - Wispr Flow
-

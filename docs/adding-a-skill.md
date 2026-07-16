@@ -5,11 +5,19 @@
 3. Add a concise, behavior-oriented `SKILL.md`.
 4. Add a practical human-readable `README.md`.
 5. Add references only when they improve repeated use.
-6. Add representative evaluation cases.
+6. Add representative evaluation cases with self-contained prompts, reference outputs, and behavioral invariants.
 7. Add `EXPERIMENTAL.md` if the skill is still emerging.
 8. Run `./scripts/validate`.
 9. Install and test the skill in a real workflow.
 10. Add the skill to the root README's skill list, labeled `(experimental)` when applicable.
+
+Run the new skill's cases locally:
+
+```sh
+./scripts/eval --skill example-skill
+```
+
+Use `--dry-run` to verify discovery without model calls. Experimental failures are non-blocking unless `--strict-experimental` is supplied.
 
 Minimal template:
 

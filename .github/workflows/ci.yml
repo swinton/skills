@@ -1,0 +1,142 @@
+name: CI
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/ci.yml"
+      - "docs/**"
+      - "scripts/**"
+      - "skills/**"
+      - "tests/**"
+      - "sync_skills.py"
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      strict_experimental:
+        description: Make experimental skill failures blocking
+        required: false
+        default: false
+        type: boolean
+  schedule:
+    - cron: "17 14 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: skills-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate repository
+        run: ./scripts/validate
+      - name: Test sync utility
+        run: python3 -m unittest discover -s tests -p 'test_*.py'
+      - name: Test evaluator
+        run: ./tests/test_eval.sh
+      - name: Test isolated installation
+        run: |
+          target=$(mktemp -d)
+          ./scripts/install --all --include-experimental --target "$target"
+          test -L "$target/intent-dictation"
+          test -L "$target/schedule-meeting"
+          test -L "$target/whoami"
+
+  eval:
+    name: Stable skill evals
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      EVAL_MODEL: claude-sonnet-5
+      EVAL_MAX_BUDGET_USD: "1.00"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Select affected skill evaluations
+        id: selection
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          args=(--all --dry-run)
+          compare_base=
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            compare_base="$PR_BASE_SHA"
+          elif [[ "$EVENT_NAME" == "push" && "$PUSH_BEFORE_SHA" != "0000000000000000000000000000000000000000" ]]; then
+            compare_base="$PUSH_BEFORE_SHA"
+          fi
+          if [[ -n "$compare_base" ]]; then
+            args+=(--changed-since "$compare_base")
+            echo "compare_base=$compare_base" >> "$GITHUB_OUTPUT"
+          fi
+          selection=$(./scripts/eval "${args[@]}")
+          printf '%s\n' "$selection"
+          count=$(printf '%s\n' "$selection" | tail -1 | cut -d' ' -f1)
+          echo "case_count=$count" >> "$GITHUB_OUTPUT"
+          if [[ "$count" -gt 0 ]]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "## Skill evals"
+              echo
+              echo "No behavioral evals are affected by this change."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/setup-node@v4
+        if: steps.selection.outputs.should_run == 'true'
+        with:
+          node-version: "22"
+      - name: Require evaluation credentials
+        if: steps.selection.outputs.should_run == 'true'
+        run: test -n "$ANTHROPIC_API_KEY"
+      - name: Install pinned Claude Code
+        if: steps.selection.outputs.should_run == 'true'
+        run: npm install --global @anthropic-ai/claude-code@2.1.197
+      - name: Run affected skill evaluations
+        if: steps.selection.outputs.should_run == 'true'
+        shell: bash
+        env:
+          COMPARE_BASE: ${{ steps.selection.outputs.compare_base }}
+        run: |
+          args=(--all --output artifacts/evals.json --junit artifacts/evals.xml)
+          if [[ -n "$COMPARE_BASE" ]]; then
+            args+=(--changed-since "$COMPARE_BASE")
+          fi
+          if [[ "${{ inputs.strict_experimental || false }}" == "true" ]]; then
+            args+=(--strict-experimental)
+          fi
+          ./scripts/eval "${args[@]}"
+      - name: Write job summary
+        if: always()
+        run: |
+          if test -f artifacts/evals.json; then
+            ruby -rjson -e '
+              summary = JSON.parse(File.read(ARGV.fetch(0)))
+              puts "## Skill evals"
+              puts
+              puts "- Model: `#{summary["model"]}`"
+              puts "- Passed: #{summary["passed"]}/#{summary["total"]}"
+              puts "- Blocking failures: #{summary["blocking_failures"]}"
+              puts "- Infrastructure failures: #{summary["infrastructure_failures"]}"
+              puts "- Passed after retry: #{summary["flaky"]}"
+            ' artifacts/evals.json >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.selection.outputs.should_run == 'true'
+        with:
+          name: skill-eval-results
+          path: artifacts/
+          if-no-files-found: warn

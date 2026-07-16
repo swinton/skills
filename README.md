@@ -1,5 +1,7 @@
 # Personal AI Skills
 
+[![CI](https://github.com/swinton/skills/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/swinton/skills/actions/workflows/ci.yml)
+
 A curated collection of personal AI skills.
 
 Stable skills are workflows I trust and use regularly. Experimental skills are ideas under active development. Every stable skill began life as an experiment.
@@ -91,7 +93,25 @@ uv run sync_skills.py push-api [skill-name]
 ./scripts/validate
 ```
 
-Validation checks skill names, required files, frontmatter names, and YAML evaluation files using Ruby's standard YAML library.
+Validation checks skill names, required files, frontmatter names, and the evaluation-case schema using Ruby's standard YAML library.
+
+Run every behavioral evaluation:
+
+```sh
+./scripts/eval --all
+```
+
+The evaluator verifies isolated installation, loads each skill's instructions and references explicitly into Claude Code, and uses a separate structured judge call to check the candidate against the case invariants. Loading instructions explicitly keeps headless CI independent of Claude Code's interactive slash-command discovery. Stable-skill failures block after one retry. Experimental-skill failures are reported but do not produce a failing exit status unless `--strict-experimental` is supplied.
+
+Evaluation requires Claude Code and `ANTHROPIC_API_KEY`. Use `./scripts/eval --all --dry-run` to inspect case discovery without making model calls. CI writes complete candidate outputs and judge explanations to downloadable JSON and JUnit artifacts.
+
+GitHub Actions runs validation, Python unit tests, evaluator tests, installation smoke tests, and affected skill evaluations. A change within `skills/<name>/` runs that skill's cases; changes to the evaluator, installer, or CI workflow run all cases; unrelated documentation changes skip model calls. Scheduled and manually dispatched workflows run the complete suite. Configure `ANTHROPIC_API_KEY` as a repository Actions secret, then require the `Validate` and `Stable skill evals` checks in branch protection.
+
+Use the same changed-only selection locally:
+
+```sh
+./scripts/eval --all --changed-since origin/main
+```
 
 ## Add a skill
 
