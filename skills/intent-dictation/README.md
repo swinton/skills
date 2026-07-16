@@ -38,6 +38,20 @@ Use the intent-dictation skill. Return only the polished text:
 <rough transcript>
 ```
 
+## Non-interactive filter
+
+Use the skill as a stdin-to-stdout command:
+
+```sh
+{ printf '%s\n\n' '/intent-dictation'; cat; } | claude -p
+```
+
+Compose it with other commands:
+
+```sh
+transcript-command | { printf '%s\n\n' '/intent-dictation'; cat; } | claude -p
+```
+
 ## Apple Dictation workflow
 
 1. Dictate the rough text into Claude Code or another text field.
@@ -53,12 +67,10 @@ Use the intent-dictation skill. This is an email. Do not add a greeting or sign-
 <rough transcript>
 ```
 
-For a clipboard-oriented terminal workflow, Claude Code's locally verified `-p/--print` option accepts a prompt non-interactively. On macOS:
+For a clipboard-oriented terminal workflow on macOS:
 
 ```sh
-pbpaste | { printf '%s\n\n' \
-  'Use the intent-dictation skill. Return only the polished text.'; cat; } \
-  | claude -p | pbcopy
+pbpaste | { printf '%s\n\n' '/intent-dictation'; cat; } | claude -p | pbcopy
 ```
 
 This reads a transcript from the clipboard, sends the instruction and transcript to Claude, and copies Claude's output back to the clipboard. Review sensitive or high-stakes text before pasting it elsewhere.
@@ -79,4 +91,3 @@ Run:
 - Punctuation spoken inside technical strings can be difficult to distinguish from prose.
 - Output can vary while still satisfying the same invariants.
 - The skill depends on the language model following its instructions; evaluations are currently reviewed by humans.
-

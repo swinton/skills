@@ -33,6 +33,34 @@ By default, the installer creates symbolic links in `~/.claude/skills`, so repos
 
 In Claude Code, explicitly invoke an installed skill with its slash command, such as `/intent-dictation` or `/whoami`.
 
+## Run a skill non-interactively
+
+Claude Code's `-p/--print` mode reads a prompt from stdin and writes the result to stdout. Prepend the skill's slash command to incoming data with a shell group:
+
+```sh
+{ printf '%s\n\n' '/intent-dictation'; cat; } | claude -p
+```
+
+This is the standard one-line pattern for a skill that transforms stdin:
+
+```sh
+producer | { printf '%s\n\n' '/skill-name'; cat; } | claude -p | consumer
+```
+
+For example:
+
+```sh
+pbpaste | { printf '%s\n\n' '/intent-dictation'; cat; } | claude -p | pbcopy
+```
+
+For a skill that needs no additional input:
+
+```sh
+printf '%s\n' '/whoami' | claude -p
+```
+
+Run non-interactive commands from a directory you trust. Skills that use external tools still require those tools, authentication, network access, and any applicable Claude Code permissions.
+
 ## Validate
 
 ```sh

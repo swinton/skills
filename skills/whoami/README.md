@@ -38,6 +38,12 @@ In Claude Code:
 /whoami
 ```
 
+Run it non-interactively and write the summary to stdout:
+
+```sh
+printf '%s\n' '/whoami' | claude -p
+```
+
 You can also ask:
 
 ```text
@@ -45,4 +51,3 @@ Use the whoami skill to tell me which GitHub account is authenticated.
 ```
 
 This skill is intentionally simple and is useful as an end-to-end test of skill installation, invocation, shell-tool access, GitHub authentication, and formatted output.
-
