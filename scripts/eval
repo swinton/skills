@@ -12,6 +12,7 @@ SKILLS_DIR = File.join(ROOT, "skills")
 CLAUDE = ENV.fetch("CLAUDE_BIN", "claude")
 MODEL = ENV.fetch("EVAL_MODEL", "claude-sonnet-5")
 MAX_BUDGET = ENV.fetch("EVAL_MAX_BUDGET_USD", "1.00")
+GIT = ENV.fetch("GIT_BIN", "git")
 
 options = {
   all: false,
@@ -19,6 +20,7 @@ options = {
   case_id: nil,
   dry_run: false,
   strict_experimental: false,
+  changed_since: nil,
   output: ENV["EVAL_OUTPUT"],
   junit: ENV["EVAL_JUNIT"]
 }
@@ -28,6 +30,7 @@ OptionParser.new do |parser|
   parser.on("--all", "Evaluate every skill") { options[:all] = true }
   parser.on("--skill NAME", "Evaluate one skill") { |name| options[:skill] = name }
   parser.on("--case ID", "Evaluate one case ID") { |id| options[:case_id] = id }
+  parser.on("--changed-since REF", "Evaluate only skills affected since Git REF") { |ref| options[:changed_since] = ref }
   parser.on("--dry-run", "List selected cases without calling Claude") { options[:dry_run] = true }
   parser.on("--strict-experimental", "Make experimental failures blocking") { options[:strict_experimental] = true }
   parser.on("--output PATH", "Write JSON results to PATH") { |path| options[:output] = path }
@@ -36,6 +39,28 @@ OptionParser.new do |parser|
 end.parse!
 
 abort "error: choose either --all or --skill NAME" if options[:all] == !!options[:skill]
+abort "error: --changed-since requires --all" if options[:changed_since] && !options[:all]
+
+def all_skills
+  Dir.children(SKILLS_DIR).select { |name| File.directory?(File.join(SKILLS_DIR, name)) }.sort
+end
+
+def changed_skills(ref)
+  output, error, status = Open3.capture3(GIT, "diff", "--name-only", "#{ref}...HEAD")
+  abort "error: could not inspect changes since #{ref}: #{error.strip}" unless status.success?
+  paths = output.lines.map(&:strip).reject(&:empty?)
+  global_paths = [
+    ".github/workflows/ci.yml",
+    "scripts/eval",
+    "scripts/install"
+  ]
+  return all_skills if paths.any? { |path| global_paths.include?(path) }
+
+  paths.each_with_object([]) do |path, skills|
+    match = path.match(%r{\Askills/([^/]+)/})
+    skills << match[1] if match
+  end.uniq.select { |skill| File.directory?(File.join(SKILLS_DIR, skill)) }.sort
+end
 
 def load_cases(skill)
   path = File.join(SKILLS_DIR, skill, "evals", "cases.yaml")
@@ -122,7 +147,7 @@ judge_schema = {
 }
 
 skills = if options[:all]
-  Dir.children(SKILLS_DIR).select { |name| File.directory?(File.join(SKILLS_DIR, name)) }.sort
+  options[:changed_since] ? changed_skills(options[:changed_since]) : all_skills
 else
   [options[:skill]]
 end
@@ -135,11 +160,29 @@ selected = skills.flat_map do |skill|
   end
 end
 
-abort "error: no evaluation cases selected" if selected.empty?
-
 if options[:dry_run]
   selected.each { |skill, kase| puts "#{skill}/#{kase.fetch("id")}" }
   puts "#{selected.length} case(s)"
+  exit
+end
+
+if selected.empty?
+  summary = {
+    "model" => MODEL,
+    "total" => 0,
+    "passed" => 0,
+    "failed" => 0,
+    "blocking_failures" => 0,
+    "infrastructure_failures" => 0,
+    "flaky" => 0,
+    "results" => []
+  }
+  json = JSON.pretty_generate(summary)
+  if options[:output]
+    FileUtils.mkdir_p(File.dirname(File.expand_path(options[:output])))
+    File.write(options[:output], "#{json}\n")
+  end
+  puts json
   exit
 end
 

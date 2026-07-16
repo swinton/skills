@@ -8,6 +8,7 @@ trap 'rm -rf "$TMPDIR_ROOT"' EXIT HUP INT TERM
 
 FAKE="$TMPDIR_ROOT/claude"
 STATE="$TMPDIR_ROOT/state"
+FAKE_GIT="$TMPDIR_ROOT/git"
 
 cat >"$FAKE" <<'EOF'
 #!/bin/sh
@@ -47,9 +48,39 @@ printf '{"result":%s}\n' "$(printf '%s' "$result" | ruby -rjson -e 'puts JSON.ge
 EOF
 chmod +x "$FAKE"
 
+cat >"$FAKE_GIT" <<'EOF'
+#!/bin/sh
+case "${FAKE_GIT_MODE:-skill}" in
+  skill)
+    printf '%s\n' skills/whoami/SKILL.md README.md
+    ;;
+  global)
+    printf '%s\n' scripts/eval
+    ;;
+  docs)
+    printf '%s\n' README.md docs/conventions.md
+    ;;
+esac
+EOF
+chmod +x "$FAKE_GIT"
+
 dry_run=$("$ROOT/scripts/eval" --all --dry-run)
 printf '%s\n' "$dry_run" | grep -q 'intent-dictation/remove-fillers'
 printf '%s\n' "$dry_run" | grep -q '29 case(s)'
+
+changed=$(FAKE_GIT_MODE=skill GIT_BIN="$FAKE_GIT" "$ROOT/scripts/eval" --all --changed-since base --dry-run)
+printf '%s\n' "$changed" | grep -q 'whoami/complete-profile'
+printf '%s\n' "$changed" | grep -q '4 case(s)'
+if printf '%s\n' "$changed" | grep -q 'intent-dictation/'; then
+  echo "error: unchanged skill was selected" >&2
+  exit 1
+fi
+
+global=$(FAKE_GIT_MODE=global GIT_BIN="$FAKE_GIT" "$ROOT/scripts/eval" --all --changed-since base --dry-run)
+printf '%s\n' "$global" | grep -q '29 case(s)'
+
+docs=$(FAKE_GIT_MODE=docs GIT_BIN="$FAKE_GIT" "$ROOT/scripts/eval" --all --changed-since base --dry-run)
+printf '%s\n' "$docs" | grep -q '0 case(s)'
 
 CLAUDE_BIN="$FAKE" "$ROOT/scripts/eval" --skill whoami --case sparse-profile --output "$TMPDIR_ROOT/pass.json" --junit "$TMPDIR_ROOT/pass.xml" >/dev/null
 ruby -rjson -e 's=JSON.parse(File.read(ARGV[0])); abort unless s["passed"] == 1 && s["blocking_failures"] == 0' "$TMPDIR_ROOT/pass.json"

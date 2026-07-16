@@ -105,7 +105,13 @@ The evaluator verifies isolated installation, loads each skill's instructions an
 
 Evaluation requires Claude Code and `ANTHROPIC_API_KEY`. Use `./scripts/eval --all --dry-run` to inspect case discovery without making model calls. CI writes complete candidate outputs and judge explanations to downloadable JSON and JUnit artifacts.
 
-GitHub Actions runs validation, Python unit tests, evaluator tests, installation smoke tests, and all skill evaluations. Configure `ANTHROPIC_API_KEY` as a repository Actions secret, then require the `Validate` and `Stable skill evals` checks in branch protection.
+GitHub Actions runs validation, Python unit tests, evaluator tests, installation smoke tests, and affected skill evaluations. A change within `skills/<name>/` runs that skill's cases; changes to the evaluator, installer, or CI workflow run all cases; unrelated documentation changes skip model calls. Scheduled and manually dispatched workflows run the complete suite. Configure `ANTHROPIC_API_KEY` as a repository Actions secret, then require the `Validate` and `Stable skill evals` checks in branch protection.
+
+Use the same changed-only selection locally:
+
+```sh
+./scripts/eval --all --changed-since origin/main
+```
 
 ## Add a skill
 

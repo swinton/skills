@@ -29,6 +29,8 @@ The invariants are authoritative; wording may differ from the reference output. 
 
 Stable-skill eval failures block CI after one automatic retry. Eval failures for skills containing `EXPERIMENTAL.md` are visible but non-blocking by default. Run `./scripts/eval --all --strict-experimental` before graduating an experimental skill.
 
+Pull-request and push CI evaluates only affected skills. Any changed path under `skills/<skill-name>/` selects that skill. Changes to shared evaluation or installation behavior select every skill. Scheduled, manual, and strict graduation runs evaluate the complete suite.
+
 ## Experimental status
 
 Add a non-empty `EXPERIMENTAL.md` to mark an emerging skill as experimental. This marker is the source of truth; do not add lifecycle metadata to `SKILL.md` frontmatter.

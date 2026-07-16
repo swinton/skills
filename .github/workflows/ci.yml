@@ -60,17 +60,61 @@ jobs:
       EVAL_MAX_BUDGET_USD: "1.00"
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Select affected skill evaluations
+        id: selection
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          args=(--all --dry-run)
+          compare_base=
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            compare_base="$PR_BASE_SHA"
+          elif [[ "$EVENT_NAME" == "push" && "$PUSH_BEFORE_SHA" != "0000000000000000000000000000000000000000" ]]; then
+            compare_base="$PUSH_BEFORE_SHA"
+          fi
+          if [[ -n "$compare_base" ]]; then
+            args+=(--changed-since "$compare_base")
+            echo "compare_base=$compare_base" >> "$GITHUB_OUTPUT"
+          fi
+          selection=$(./scripts/eval "${args[@]}")
+          printf '%s\n' "$selection"
+          count=$(printf '%s\n' "$selection" | tail -1 | cut -d' ' -f1)
+          echo "case_count=$count" >> "$GITHUB_OUTPUT"
+          if [[ "$count" -gt 0 ]]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "## Skill evals"
+              echo
+              echo "No behavioral evals are affected by this change."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
       - uses: actions/setup-node@v4
+        if: steps.selection.outputs.should_run == 'true'
         with:
           node-version: "22"
       - name: Require evaluation credentials
+        if: steps.selection.outputs.should_run == 'true'
         run: test -n "$ANTHROPIC_API_KEY"
       - name: Install pinned Claude Code
+        if: steps.selection.outputs.should_run == 'true'
         run: npm install --global @anthropic-ai/claude-code@2.1.197
-      - name: Run every skill evaluation
+      - name: Run affected skill evaluations
+        if: steps.selection.outputs.should_run == 'true'
         shell: bash
+        env:
+          COMPARE_BASE: ${{ steps.selection.outputs.compare_base }}
         run: |
           args=(--all --output artifacts/evals.json --junit artifacts/evals.xml)
+          if [[ -n "$COMPARE_BASE" ]]; then
+            args+=(--changed-since "$COMPARE_BASE")
+          fi
           if [[ "${{ inputs.strict_experimental || false }}" == "true" ]]; then
             args+=(--strict-experimental)
           fi
@@ -91,7 +135,7 @@ jobs:
             ' artifacts/evals.json >> "$GITHUB_STEP_SUMMARY"
           fi
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && steps.selection.outputs.should_run == 'true'
         with:
           name: skill-eval-results
           path: artifacts/
