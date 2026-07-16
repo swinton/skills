@@ -6,9 +6,10 @@
 4. Add a practical human-readable `README.md`.
 5. Add references only when they improve repeated use.
 6. Add representative evaluation cases.
-7. Run `./scripts/validate`.
-8. Install and test the skill in a real workflow.
-9. Add the skill to the root README's skill list.
+7. Add `EXPERIMENTAL.md` if the skill is still emerging.
+8. Run `./scripts/validate`.
+9. Install and test the skill in a real workflow.
+10. Add the skill to the root README's skill list, labeled `(experimental)` when applicable.
 
 Minimal template:
 
@@ -17,6 +18,7 @@ skills/
 └── example-skill/
     ├── SKILL.md
     ├── README.md
+    ├── EXPERIMENTAL.md  # optional lifecycle marker
     ├── references/       # optional
     └── evals/            # when examples demonstrate behavior
         ├── cases.yaml
@@ -25,3 +27,4 @@ skills/
 
 Start with the smallest instructions that reliably produce the intended behavior. Add examples from actual failures rather than designing speculative abstractions.
 
+For an experimental skill, use the marker template in [conventions.md](conventions.md). Document why it is experimental, known limitations or risks, feedback needed, and observable graduation criteria.

@@ -41,6 +41,9 @@ for path in "$SKILLS_DIR"/*; do
 
   [ -s "$path/SKILL.md" ] || fail "$name: missing or empty SKILL.md"
   [ -f "$path/README.md" ] || fail "$name: missing README.md"
+  if [ -e "$path/EXPERIMENTAL.md" ] && { [ ! -f "$path/EXPERIMENTAL.md" ] || [ ! -s "$path/EXPERIMENTAL.md" ]; }; then
+    fail "$name: EXPERIMENTAL.md must be a non-empty file"
+  fi
 
   if [ -s "$path/SKILL.md" ]; then
     if ! ruby -ryaml -e '

@@ -6,12 +6,14 @@ usage() {
   cat <<'EOF'
 Usage:
   ./scripts/install SKILL [--target DIRECTORY] [--force]
-  ./scripts/install --all [--target DIRECTORY] [--force]
+  ./scripts/install --all [--include-experimental] [--target DIRECTORY] [--force]
 
 Install repository skills into Claude Code using symbolic links.
 
 Options:
-  --all               Install every skill.
+  --all               Install every stable skill.
+  --include-experimental
+                      Include experimental skills with --all.
   --target DIRECTORY  Destination directory (default: ~/.claude/skills).
   --force             Replace an existing symlink, or move an existing file or
                       directory aside to a timestamped backup before installing.
@@ -24,6 +26,7 @@ REPO_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
 SKILLS_DIR="$REPO_ROOT/skills"
 TARGET_DIR="${HOME}/.claude/skills"
 INSTALL_ALL=false
+INCLUDE_EXPERIMENTAL=false
 FORCE=false
 SKILL_NAME=
 
@@ -31,6 +34,9 @@ while [ "$#" -gt 0 ]; do
   case "$1" in
     --all)
       INSTALL_ALL=true
+      ;;
+    --include-experimental)
+      INCLUDE_EXPERIMENTAL=true
       ;;
     --target)
       [ "$#" -ge 2 ] || { echo "error: --target requires a directory" >&2; exit 2; }
@@ -65,6 +71,11 @@ if [ "$INSTALL_ALL" = true ] && [ -n "$SKILL_NAME" ]; then
   exit 2
 fi
 
+if [ "$INCLUDE_EXPERIMENTAL" = true ] && [ "$INSTALL_ALL" = false ]; then
+  echo "error: --include-experimental requires --all" >&2
+  exit 2
+fi
+
 if [ "$INSTALL_ALL" = false ] && [ -z "$SKILL_NAME" ]; then
   echo "error: specify a skill name or --all" >&2
   usage >&2
@@ -81,6 +92,10 @@ install_skill() {
   if [ ! -d "$source_path" ] || [ ! -f "$source_path/SKILL.md" ]; then
     echo "error: unknown or invalid skill: $name" >&2
     return 1
+  fi
+
+  if [ -f "$source_path/EXPERIMENTAL.md" ]; then
+    echo "warning: $name is experimental" >&2
   fi
 
   if [ -L "$destination" ] && [ "$(readlink "$destination")" = "$source_path" ]; then
@@ -112,10 +127,13 @@ if [ "$INSTALL_ALL" = true ]; then
   for skill_path in "$SKILLS_DIR"/*; do
     [ -d "$skill_path" ] || continue
     found=true
+    if [ -f "$skill_path/EXPERIMENTAL.md" ] && [ "$INCLUDE_EXPERIMENTAL" = false ]; then
+      echo "skipped: $(basename "$skill_path") is experimental; use --include-experimental"
+      continue
+    fi
     install_skill "$(basename "$skill_path")"
   done
   [ "$found" = true ] || { echo "error: no skills found" >&2; exit 1; }
 else
   install_skill "$SKILL_NAME"
 fi
-

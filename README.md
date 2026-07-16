@@ -29,6 +29,14 @@ Install every skill:
 ./scripts/install --all
 ```
 
+Experimental skills are excluded from bulk installation by default. Include them explicitly:
+
+```sh
+./scripts/install --all --include-experimental
+```
+
+Installing an experimental skill by name is allowed and prints a warning.
+
 By default, the installer creates symbolic links in `~/.claude/skills`, so repository edits are immediately available. Run `./scripts/install --help` for target-directory and replacement options.
 
 In Claude Code, explicitly invoke an installed skill with its slash command, such as `/intent-dictation` or `/whoami`.
@@ -74,6 +82,12 @@ Validation checks skill names, required files, frontmatter names, and YAML evalu
 Read [docs/adding-a-skill.md](docs/adding-a-skill.md). The short version is: create a focused directory under `skills/`, add `SKILL.md` and `README.md`, include representative evaluation cases, then validate and test it in a real workflow.
 
 Skills are expected to evolve based on real-world use. Prefer adding a failed or awkward example to the evaluations before broadening instructions abstractly.
+
+## Experimental skills
+
+A skill is experimental when its directory contains a non-empty `EXPERIMENTAL.md`. The marker should explain why the skill is experimental, its known limitations or risks, the feedback needed, and its graduation criteria.
+
+Experimental skills are deliberately easy to try but excluded from `./scripts/install --all` unless `--include-experimental` is supplied. Remove the marker when the graduation criteria are met.
 
 ## Current skills
 
