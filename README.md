@@ -1,6 +1,7 @@
 # Personal AI Skills
 
 [![CI](https://github.com/swinton/skills/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/swinton/skills/actions/workflows/ci.yml)
+[![Agent Security](https://github.com/swinton/skills/actions/workflows/agent-security.yml/badge.svg?branch=main)](https://github.com/swinton/skills/actions/workflows/agent-security.yml)
 
 A curated collection of personal AI skills.
 
@@ -112,6 +113,12 @@ Use the same changed-only selection locally:
 ```sh
 ./scripts/eval --all --changed-since origin/main
 ```
+
+## Security scanning
+
+Committed skills are scanned with [Snyk Agent Scan](https://github.com/snyk/agent-scan) for known malicious and risky patterns, including prompt injection, suspicious downloads, credential handling, hardcoded secrets, and hidden content. Pull requests and pushes scan affected skills; scheduled and manual workflows scan the complete collection.
+
+Agent Scan is an independent, best-effort signal rather than proof that a skill is safe or non-malicious. Review skill source before installation and run agents with least-privilege tool permissions. The scanner sends redacted contents of these public skill directories to Snyk's analysis API.
 
 ## Add a skill
 

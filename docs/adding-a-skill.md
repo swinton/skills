@@ -8,8 +8,9 @@
 6. Add representative evaluation cases with self-contained prompts, reference outputs, and behavioral invariants.
 7. Add `EXPERIMENTAL.md` if the skill is still emerging.
 8. Run `./scripts/validate`.
-9. Install and test the skill in a real workflow.
-10. Add the skill to the root README's skill list, labeled `(experimental)` when applicable.
+9. Run the skill through Snyk Agent Scan when `SNYK_TOKEN` is available.
+10. Install and test the skill in a real workflow.
+11. Add the skill to the root README's skill list, labeled `(experimental)` when applicable.
 
 Run the new skill's cases locally:
 
@@ -18,6 +19,15 @@ Run the new skill's cases locally:
 ```
 
 Use `--dry-run` to verify discovery without model calls. Experimental failures are non-blocking unless `--strict-experimental` is supplied.
+
+Run the same security scanner used by CI:
+
+```sh
+SNYK_TOKEN=... uvx --from snyk-agent-scan==0.5.15 snyk-agent-scan \
+  --ci --dangerously-run-mcp-servers skills/example-skill
+```
+
+Only pass explicit skill paths. The current Agent Scan CLI requires the dangerous MCP flag in CI mode even when no MCP configuration is supplied.
 
 Minimal template:
 
