@@ -209,12 +209,18 @@ def command_status(args: argparse.Namespace) -> int:
             print(f"  = {name}")
 
     if new or changed:
+        pending = [*new, *changed]
         print(
             "\nPersonal claude.ai skills cannot currently be updated through a "
             "public API."
         )
-        print("Run `bundle` and upload the ZIPs through Customize > Skills.")
-        print("After uploading, run `mark-synced <name>` (or `--all`).")
+        print("\nBundle each NEW or CHANGED skill:")
+        for name in pending:
+            print(f"  uv run sync_skills.py bundle {name}")
+        print("\nUpload the generated ZIPs from dist/ through Customize > Skills.")
+        print("\nAfter each successful upload, record that exact skill as synced:")
+        for name in pending:
+            print(f"  uv run sync_skills.py mark-synced {name}")
         return 1 if args.check else 0
 
     print("\nNothing to upload. Personal claude.ai skills are marked in sync.")
