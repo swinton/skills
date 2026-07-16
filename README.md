@@ -101,7 +101,7 @@ Run every behavioral evaluation:
 ./scripts/eval --all
 ```
 
-The evaluator installs the skills into an isolated temporary home, invokes each skill through Claude Code, and uses a separate structured judge call to check the candidate against the case invariants. Stable-skill failures block after one retry. Experimental-skill failures are reported but do not produce a failing exit status unless `--strict-experimental` is supplied.
+The evaluator verifies isolated installation, loads each skill's instructions and references explicitly into Claude Code, and uses a separate structured judge call to check the candidate against the case invariants. Loading instructions explicitly keeps headless CI independent of Claude Code's interactive slash-command discovery. Stable-skill failures block after one retry. Experimental-skill failures are reported but do not produce a failing exit status unless `--strict-experimental` is supplied.
 
 Evaluation requires Claude Code and `ANTHROPIC_API_KEY`. Use `./scripts/eval --all --dry-run` to inspect case discovery without making model calls. CI writes complete candidate outputs and judge explanations to downloadable JSON and JUnit artifacts.
 

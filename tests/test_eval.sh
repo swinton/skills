@@ -12,11 +12,19 @@ STATE="$TMPDIR_ROOT/state"
 cat >"$FAKE" <<'EOF'
 #!/bin/sh
 input=$(cat)
+case " $* " in
+  *" --system-prompt-file "*)
+    found_system_prompt=true
+    ;;
+  *)
+    found_system_prompt=false
+    ;;
+esac
 if [ "${FAKE_MODE:-pass}" = "error" ]; then
   echo "simulated API failure" >&2
   exit 1
 fi
-if printf '%s' "$input" | grep -q '^Evaluate this candidate output'; then
+if [ "$found_system_prompt" = false ] && printf '%s' "$input" | grep -q '^Evaluate this candidate output'; then
   if [ "${FAKE_MODE:-pass}" = "retry" ]; then
     count=0
     [ ! -f "$FAKE_STATE" ] || count=$(cat "$FAKE_STATE")
@@ -29,6 +37,10 @@ if printf '%s' "$input" | grep -q '^Evaluate this candidate output'; then
     result='{"pass":true,"reason":"passed","failed_invariants":[]}'
   fi
 else
+  [ "$found_system_prompt" = true ] || {
+    echo "candidate call omitted --system-prompt-file" >&2
+    exit 1
+  }
   result='Candidate response'
 fi
 printf '{"result":%s}\n' "$(printf '%s' "$result" | ruby -rjson -e 'puts JSON.generate(STDIN.read)')"

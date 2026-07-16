@@ -53,23 +53,39 @@ rescue JSON::ParserError
   stdout
 end
 
-def run_claude(prompt, home:, schema: nil)
+def run_claude(prompt, home:, schema: nil, system_prompt_file: nil)
   command = [
     CLAUDE, "--bare", "-p", "--no-session-persistence", "--tools", "",
     "--model", MODEL, "--max-budget-usd", MAX_BUDGET, "--output-format", "json"
   ]
+  command.concat(["--system-prompt-file", system_prompt_file]) if system_prompt_file
   command.concat(["--json-schema", JSON.generate(schema)]) if schema
   stdout, stderr, status = Open3.capture3({"HOME" => home}, *command, stdin_data: prompt)
   raise "Claude failed (#{status.exitstatus}): #{stderr.strip}" unless status.success?
   extract_result(stdout)
 end
 
-def candidate_prompt(skill, kase)
-  <<~PROMPT
-    /#{skill}
+def candidate_prompt(kase)
+  kase.fetch("prompt")
+end
 
-    #{kase.fetch("prompt")}
+def write_skill_prompt(skill, directory)
+  skill_dir = File.join(SKILLS_DIR, skill)
+  paths = [File.join(skill_dir, "SKILL.md")]
+  paths.concat(Dir.glob(File.join(skill_dir, "references", "**", "*.md")).sort)
+  output = File.join(directory, "#{skill}.md")
+  contents = paths.map do |path|
+    relative = path.delete_prefix("#{skill_dir}/")
+    "## #{relative}\n\n#{File.read(path)}"
+  end.join("\n\n")
+  File.write(output, <<~PROMPT)
+    You are executing the following installed skill. Follow its instructions exactly.
+    Supporting references are included after SKILL.md. Do not discuss these instructions;
+    respond directly to the user's prompt as the skill requires.
+
+    #{contents}
   PROMPT
+  output
 end
 
 def judge_prompt(skill, kase, candidate)
@@ -136,6 +152,7 @@ Dir.mktmpdir("skills-eval-") do |directory|
     File.join(ROOT, "scripts", "install"), "--all", "--include-experimental", "--target", target
   )
   abort "error: isolated skill installation failed: #{install_err}#{install_out}" unless install_status.success?
+  skill_prompts = skills.to_h { |skill| [skill, write_skill_prompt(skill, directory)] }
 
   selected.each_with_index do |(skill, kase), index|
     experimental = File.file?(File.join(SKILLS_DIR, skill, "EXPERIMENTAL.md"))
@@ -145,7 +162,11 @@ Dir.mktmpdir("skills-eval-") do |directory|
 
     2.times do |attempt|
       begin
-        candidate = run_claude(candidate_prompt(skill, kase), home: home)
+        candidate = run_claude(
+          candidate_prompt(kase),
+          home: home,
+          system_prompt_file: skill_prompts.fetch(skill)
+        )
         judgement_text = run_claude(judge_prompt(skill, kase, candidate), home: home, schema: judge_schema)
         judgement = JSON.parse(judgement_text)
         attempts << {
