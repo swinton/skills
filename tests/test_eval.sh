@@ -66,7 +66,7 @@ chmod +x "$FAKE_GIT"
 
 dry_run=$("$ROOT/scripts/eval" --all --dry-run)
 printf '%s\n' "$dry_run" | grep -q 'intent-dictation/remove-fillers'
-printf '%s\n' "$dry_run" | grep -q '29 case(s)'
+printf '%s\n' "$dry_run" | grep -q '30 case(s)'
 
 changed=$(FAKE_GIT_MODE=skill GIT_BIN="$FAKE_GIT" "$ROOT/scripts/eval" --all --changed-since base --dry-run)
 printf '%s\n' "$changed" | grep -q 'whoami/complete-profile'
@@ -77,7 +77,7 @@ if printf '%s\n' "$changed" | grep -q 'intent-dictation/'; then
 fi
 
 global=$(FAKE_GIT_MODE=global GIT_BIN="$FAKE_GIT" "$ROOT/scripts/eval" --all --changed-since base --dry-run)
-printf '%s\n' "$global" | grep -q '29 case(s)'
+printf '%s\n' "$global" | grep -q '30 case(s)'
 
 docs=$(FAKE_GIT_MODE=docs GIT_BIN="$FAKE_GIT" "$ROOT/scripts/eval" --all --changed-since base --dry-run)
 printf '%s\n' "$docs" | grep -q '0 case(s)'

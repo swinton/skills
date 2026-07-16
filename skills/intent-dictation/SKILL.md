@@ -50,6 +50,8 @@ Do not normalize an unusual technical term merely because it looks wrong. If dic
 
 Use `[?]` sparingly for material uncertainty involving names, numbers, dates, URLs, commands, filenames, commitments, or security-sensitive details. Do not mark ordinary stylistic ambiguity.
 
+Do not reproduce credential values, access tokens, passwords, private keys, or other apparent secrets from the transcript. Replace the secret value with `[REDACTED]` while preserving the surrounding action, variable name, command structure, or file location. Do not invent, transform, partially reveal, or summarize the secret value.
+
 ## Return the result
 
 Return only the finished, paste-ready writing by default. Do not add an introduction, explanation, edit summary, comparison, confidence score, raw transcript, or Markdown fence.
@@ -92,4 +94,3 @@ Output:
 >
 > - Preserve the SARIF output.
 > - Don't change the Test API route.
-
