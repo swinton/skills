@@ -5,6 +5,9 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
+from argparse import Namespace
+from contextlib import redirect_stdout
+from io import StringIO
 from pathlib import Path
 
 import sync_skills
@@ -79,6 +82,62 @@ class StateTests(unittest.TestCase):
             self.assertEqual(
                 state,
                 json.loads(state_file.read_text(encoding="utf-8")),
+            )
+
+
+class StatusOutputTests(unittest.TestCase):
+    """Verify that drift output gives exact, targeted next commands."""
+
+    def test_status_prints_commands_only_for_new_and_changed_skills(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            skills_dir = root / "skills"
+            state_file = skills_dir / ".sync-state.json"
+            for name in ("changed-skill", "current-skill", "new-skill"):
+                skill_dir = skills_dir / name
+                skill_dir.mkdir(parents=True)
+                (skill_dir / "SKILL.md").write_text(
+                    f"---\nname: {name}\ndescription: Test.\n---\n",
+                    encoding="utf-8",
+                )
+
+            state = {
+                "changed-skill": {"claude_ai_hash": "outdated"},
+                "current-skill": {
+                    "claude_ai_hash": sync_skills.hash_skill_dir(
+                        skills_dir / "current-skill"
+                    )
+                },
+            }
+            sync_skills.save_state(state_file, state)
+            output = StringIO()
+            args = Namespace(
+                skills_dir=skills_dir,
+                state_file=state_file,
+                check=False,
+            )
+
+            with redirect_stdout(output):
+                result = sync_skills.command_status(args)
+
+            rendered = output.getvalue()
+            self.assertEqual(0, result)
+            for name in ("new-skill", "changed-skill"):
+                self.assertIn(
+                    f"uv run sync_skills.py bundle {name}",
+                    rendered,
+                )
+                self.assertIn(
+                    f"uv run sync_skills.py mark-synced {name}",
+                    rendered,
+                )
+            self.assertNotIn(
+                "uv run sync_skills.py bundle current-skill",
+                rendered,
+            )
+            self.assertNotIn(
+                "uv run sync_skills.py mark-synced current-skill",
+                rendered,
             )
 
 
