@@ -1,8 +1,10 @@
 # Personal AI Skills
 
-A personal, version-controlled collection of reusable AI skills for recurring workflows.
+A curated collection of personal AI skills.
 
-This repository exists to make useful agent behavior easy to understand, install, test, and improve. It is deliberately a small collection of independent skills, not a general-purpose framework or formal skill standard.
+Stable skills are workflows I trust and use regularly. Experimental skills are ideas under active development. Every stable skill began life as an experiment.
+
+This repository keeps useful agent behavior version-controlled, understandable, installable, and easy to improve. It is deliberately a small collection of independent skills, not a general-purpose framework or formal skill standard.
 
 The first skill is [`intent-dictation`](skills/intent-dictation/README.md), which turns rough speech-to-text transcripts into polished, paste-ready writing while preserving the speaker's meaning.
 
