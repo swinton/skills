@@ -1,0 +1,115 @@
+name: Agent Security
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/agent-security.yml"
+      - "scripts/changed-skills"
+      - "skills/**"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/agent-security.yml"
+      - "scripts/changed-skills"
+      - "skills/**"
+  workflow_dispatch:
+  schedule:
+    - cron: "43 15 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agent-security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  scan:
+    name: Snyk Agent Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v6
+      - name: Select affected skills
+        id: selection
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          args=()
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            args+=(--changed-since "$PR_BASE_SHA")
+          elif [[ "$EVENT_NAME" == "push" && "$PUSH_BEFORE_SHA" != "0000000000000000000000000000000000000000" ]]; then
+            args+=(--changed-since "$PUSH_BEFORE_SHA")
+          fi
+          mapfile -t skills < <(./scripts/changed-skills "${args[@]}")
+          printf '%s\n' "${skills[@]}"
+          {
+            echo "paths<<EOF"
+            printf '%s\n' "${skills[@]}"
+            echo "EOF"
+            echo "count=${#skills[@]}"
+          } >> "$GITHUB_OUTPUT"
+      - name: Explain skipped scan
+        if: steps.selection.outputs.count == '0'
+        run: |
+          {
+            echo "## Snyk Agent Scan"
+            echo
+            echo "No skill content is affected by this change."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Explain unavailable fork credentials
+        if: >-
+          steps.selection.outputs.count != '0' &&
+          env.SNYK_TOKEN == '' &&
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.fork
+        run: |
+          {
+            echo "## Snyk Agent Scan"
+            echo
+            echo "The scan was not run because SNYK_TOKEN is unavailable."
+            echo "Fork pull requests must be moved to a maintainer-owned branch before this security gate can run."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Require security scan credentials
+        if: >-
+          steps.selection.outputs.count != '0' &&
+          env.SNYK_TOKEN == '' &&
+          !(github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork)
+        run: |
+          echo "SNYK_TOKEN is required to scan affected skills." >&2
+          exit 1
+      - name: Scan affected skills
+        if: steps.selection.outputs.count != '0' && env.SNYK_TOKEN != ''
+        shell: bash
+        env:
+          SKILL_PATHS: ${{ steps.selection.outputs.paths }}
+        run: |
+          mapfile -t skills <<< "$SKILL_PATHS"
+          uvx --from snyk-agent-scan==0.5.15 snyk-agent-scan \
+            --ci \
+            --dangerously-run-mcp-servers \
+            --json \
+            "${skills[@]}" | tee agent-scan.json
+      - name: Write scan summary
+        if: always() && steps.selection.outputs.count != '0' && env.SNYK_TOKEN != ''
+        run: |
+          {
+            echo "## Snyk Agent Scan"
+            echo
+            echo "Scanned ${{ steps.selection.outputs.count }} affected skill(s) with pinned Agent Scan 0.5.15."
+            echo
+            echo "This is a best-effort scan for known malicious and risky patterns, not a certification of safety."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always() && hashFiles('agent-scan.json') != ''
+        with:
+          name: agent-scan-results
+          path: agent-scan.json
