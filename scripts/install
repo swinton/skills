@@ -1,0 +1,121 @@
+#!/bin/sh
+
+set -eu
+
+usage() {
+  cat <<'EOF'
+Usage:
+  ./scripts/install SKILL [--target DIRECTORY] [--force]
+  ./scripts/install --all [--target DIRECTORY] [--force]
+
+Install repository skills into Claude Code using symbolic links.
+
+Options:
+  --all               Install every skill.
+  --target DIRECTORY  Destination directory (default: ~/.claude/skills).
+  --force             Replace an existing symlink, or move an existing file or
+                      directory aside to a timestamped backup before installing.
+  -h, --help          Show this help.
+EOF
+}
+
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+REPO_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
+SKILLS_DIR="$REPO_ROOT/skills"
+TARGET_DIR="${HOME}/.claude/skills"
+INSTALL_ALL=false
+FORCE=false
+SKILL_NAME=
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --all)
+      INSTALL_ALL=true
+      ;;
+    --target)
+      [ "$#" -ge 2 ] || { echo "error: --target requires a directory" >&2; exit 2; }
+      TARGET_DIR=$2
+      shift
+      ;;
+    --force)
+      FORCE=true
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    -*)
+      echo "error: unknown option: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+    *)
+      if [ -n "$SKILL_NAME" ]; then
+        echo "error: specify only one skill, or use --all" >&2
+        exit 2
+      fi
+      SKILL_NAME=$1
+      ;;
+  esac
+  shift
+done
+
+if [ "$INSTALL_ALL" = true ] && [ -n "$SKILL_NAME" ]; then
+  echo "error: do not combine --all with a skill name" >&2
+  exit 2
+fi
+
+if [ "$INSTALL_ALL" = false ] && [ -z "$SKILL_NAME" ]; then
+  echo "error: specify a skill name or --all" >&2
+  usage >&2
+  exit 2
+fi
+
+mkdir -p "$TARGET_DIR"
+
+install_skill() {
+  name=$1
+  source_path="$SKILLS_DIR/$name"
+  destination="$TARGET_DIR/$name"
+
+  if [ ! -d "$source_path" ] || [ ! -f "$source_path/SKILL.md" ]; then
+    echo "error: unknown or invalid skill: $name" >&2
+    return 1
+  fi
+
+  if [ -L "$destination" ] && [ "$(readlink "$destination")" = "$source_path" ]; then
+    echo "ok: $name is already installed"
+    return 0
+  fi
+
+  if [ -e "$destination" ] || [ -L "$destination" ]; then
+    if [ "$FORCE" != true ]; then
+      echo "error: $destination already exists; use --force to replace it safely" >&2
+      return 1
+    fi
+
+    if [ -L "$destination" ]; then
+      rm "$destination"
+    else
+      backup="${destination}.backup.$(date +%Y%m%d%H%M%S)"
+      mv "$destination" "$backup"
+      echo "backup: moved existing path to $backup"
+    fi
+  fi
+
+  ln -s "$source_path" "$destination"
+  echo "installed: $name -> $destination"
+}
+
+if [ "$INSTALL_ALL" = true ]; then
+  found=false
+  for skill_path in "$SKILLS_DIR"/*; do
+    [ -d "$skill_path" ] || continue
+    found=true
+    install_skill "$(basename "$skill_path")"
+  done
+  [ "$found" = true ] || { echo "error: no skills found" >&2; exit 1; }
+else
+  install_skill "$SKILL_NAME"
+fi
+

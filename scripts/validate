@@ -1,0 +1,79 @@
+#!/bin/sh
+
+set -eu
+
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+REPO_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
+SKILLS_DIR="$REPO_ROOT/skills"
+errors=0
+
+fail() {
+  echo "error: $*" >&2
+  errors=$((errors + 1))
+}
+
+if [ ! -d "$SKILLS_DIR" ]; then
+  echo "error: missing skills directory: $SKILLS_DIR" >&2
+  exit 1
+fi
+
+if ! command -v ruby >/dev/null 2>&1; then
+  echo "error: Ruby is required for YAML validation and is included with supported macOS versions" >&2
+  exit 1
+fi
+
+found=false
+for path in "$SKILLS_DIR"/*; do
+  [ -e "$path" ] || continue
+  found=true
+
+  if [ ! -d "$path" ]; then
+    fail "every immediate child of skills/ must be a directory: $path"
+    continue
+  fi
+
+  name=$(basename "$path")
+  case "$name" in
+    *[!a-z0-9-]*|-*|*-|*--*|"")
+      fail "invalid skill name '$name'; use lowercase kebab-case"
+      ;;
+  esac
+
+  [ -s "$path/SKILL.md" ] || fail "$name: missing or empty SKILL.md"
+  [ -f "$path/README.md" ] || fail "$name: missing README.md"
+
+  if [ -s "$path/SKILL.md" ]; then
+    if ! ruby -ryaml -e '
+      file, expected = ARGV
+      text = File.read(file)
+      abort "missing YAML frontmatter" unless text.start_with?("---\n")
+      closing = text.index("\n---\n", 4)
+      abort "unterminated YAML frontmatter" unless closing
+      metadata = YAML.safe_load(text[4...closing], permitted_classes: [], aliases: false)
+      abort "frontmatter must be a mapping" unless metadata.is_a?(Hash)
+      name = metadata["name"]
+      abort "metadata name is missing" unless name
+      abort "metadata name #{name.inspect} does not match #{expected.inspect}" unless name == expected
+    ' "$path/SKILL.md" "$name" 2>/dev/null; then
+      fail "$name: invalid SKILL.md frontmatter or mismatched metadata name"
+    fi
+  fi
+
+  if [ -d "$path/evals" ]; then
+    for yaml in "$path"/evals/*.yaml "$path"/evals/*.yml; do
+      [ -f "$yaml" ] || continue
+      if ! ruby -ryaml -e 'YAML.safe_load(File.read(ARGV.fetch(0)), permitted_classes: [], aliases: false)' "$yaml" 2>/dev/null; then
+        fail "$name: invalid YAML in ${yaml#$REPO_ROOT/}"
+      fi
+    done
+  fi
+done
+
+[ "$found" = true ] || fail "no skills found"
+
+if [ "$errors" -ne 0 ]; then
+  echo "validation failed with $errors error(s)" >&2
+  exit 1
+fi
+
+echo "validation passed"

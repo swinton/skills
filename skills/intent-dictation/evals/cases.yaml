@@ -1,0 +1,205 @@
+cases:
+  - id: remove-fillers
+    description: Removes filler words without changing meaning.
+    context: chat
+    input: |
+      hey um I think we should probably move the meeting to Thursday
+      because Tuesday is going to be difficult
+    expected: |
+      I think we should probably move the meeting to Thursday because Tuesday is going to be difficult.
+    invariants:
+      - The proposed meeting day is Thursday.
+      - Tuesday remains the reason for the change.
+      - The word "probably" preserves tentativeness.
+
+  - id: repeated-phrase
+    description: Removes accidental repetition.
+    context: chat
+    input: |
+      I reviewed the draft the draft and the permissions section looks good
+    expected: |
+      I reviewed the draft, and the permissions section looks good.
+    invariants:
+      - The speaker reviewed the draft.
+      - Only the permissions section is described as looking good.
+
+  - id: false-start
+    description: Resolves an abandoned sentence start.
+    context: email
+    input: |
+      The launch plan is no wait the main risk in the launch plan is the migration window
+    expected: |
+      The main risk in the launch plan is the migration window.
+    invariants:
+      - The migration window is the main risk.
+      - No claim is made that the launch plan itself is final.
+
+  - id: spoken-correction
+    description: Applies a direct correction.
+    context: chat
+    input: |
+      Let's meet Tuesday change Tuesday to Thursday at 2 PM
+    expected: |
+      Let's meet Thursday at 2 PM.
+    invariants:
+      - The meeting day is Thursday, not Tuesday.
+      - The time remains 2 PM.
+
+  - id: scratch-that
+    description: Removes discarded content.
+    context: chat
+    input: |
+      I'll send the report tonight scratch that I'll send it tomorrow morning
+    expected: |
+      I'll send the report tomorrow morning.
+    invariants:
+      - The commitment is tomorrow morning.
+      - Tonight is omitted.
+
+  - id: paragraph-creation
+    description: Applies a spoken paragraph break.
+    context: document
+    input: |
+      The pilot will focus on preserving intent rather than literal transcription.
+      New paragraph. We can consider local speech infrastructure after the workflow proves useful.
+    expected: |
+      The pilot will focus on preserving intent rather than literal transcription.
+
+      We can consider local speech infrastructure after the workflow proves useful.
+    invariants:
+      - The two ideas are separate paragraphs.
+      - Infrastructure remains conditional on proving the workflow useful.
+
+  - id: bullet-list
+    description: Converts spoken list structure into bullets.
+    context: notes
+    input: |
+      We need three things bullet list preserve SARIF output validate the OpenAPI document and update Passport
+    expected: |
+      We need three things:
+
+      - Preserve SARIF output.
+      - Validate the OpenAPI document.
+      - Update Passport.
+    invariants:
+      - The output contains exactly three requested items.
+      - SARIF, OpenAPI, and Passport are preserved.
+
+  - id: preserve-uncertainty
+    description: Does not turn a tentative estimate into a commitment.
+    context: chat
+    input: |
+      I think I can probably finish the review by Friday
+    expected: |
+      I think I can probably finish the review by Friday.
+    invariants:
+      - Friday remains an uncertain estimate.
+      - No firm commitment is introduced.
+
+  - id: preserve-shell-command
+    description: Protects a corrected shell command.
+    context: notes
+    input: |
+      Run uv sink scratch that uv sync and then git status
+    expected: |
+      Run `uv sync`, then `git status`.
+    invariants:
+      - The exact commands are "uv sync" and "git status".
+      - The likely misheard "uv sink" is omitted after correction.
+
+  - id: preserve-domain
+    description: Converts spoken domain punctuation without changing the domain.
+    context: chat
+    input: |
+      I don't think we should build speech dot lobot dot dev yet
+    expected: |
+      I don't think we should build speech.lobot.dev yet.
+    invariants:
+      - The domain is exactly speech.lobot.dev.
+      - The recommendation remains negative and time-qualified by "yet".
+
+  - id: preserve-product-name
+    description: Preserves a technical product name.
+    context: document
+    input: |
+      Claude code should use the unified test results from the test API
+    expected: |
+      Claude Code should use the Unified Test results from the Test API.
+    invariants:
+      - Claude Code, Unified Test, and Test API retain their product capitalization.
+      - No behavior beyond using the results is introduced.
+
+  - id: avoid-semantic-drift
+    description: Does not strengthen a recommendation.
+    context: email
+    input: |
+      My initial view is that this might be worth testing with a small group before we commit
+    expected: |
+      My initial view is that this might be worth testing with a small group before we commit.
+    invariants:
+      - The view remains initial and tentative.
+      - Testing happens before any commitment.
+      - The output does not claim the test will succeed.
+
+  - id: concise-slack
+    description: Produces a concise Slack message while preserving rationale.
+    context: chat
+    input: |
+      hey just wanted to say I took another look and I think we should start with the skill
+      because that's the part that actually tests whether this is useful
+    expected: |
+      I took another look, and I think we should start with the skill because that's the part that actually tests whether this is useful.
+    invariants:
+      - Starting with the skill remains a recommendation, not a decision.
+      - The reason is that the skill tests usefulness.
+
+  - id: structured-codex-prompt
+    description: Structures a dictated implementation prompt without weakening constraints.
+    context: prompt
+    input: |
+      Ask Codex to update the install script new paragraph requirements bullet list keep it POSIX shell
+      refuse to overwrite existing directories and run the validation script when done
+    expected: |
+      Update the install script.
+
+      Requirements:
+
+      - Keep it POSIX shell.
+      - Refuse to overwrite existing directories.
+      - Run the validation script when done.
+    invariants:
+      - All three requirements are present.
+      - The request is to update the install script.
+      - No implementation details are invented.
+
+  - id: material-uncertainty-marker
+    description: Marks an uncertain security-sensitive filename rather than guessing.
+    context: notes
+    input: |
+      Rotate the token in secrets slash prod dash off dot env I think that's the filename
+    expected: |
+      Rotate the token in `secrets/prod-off.env` [?].
+    invariants:
+      - The filename remains visibly uncertain.
+      - The action is to rotate the token.
+      - No alternative filename is invented.
+
+  - id: first-manual-test
+    description: Applies correction, domain punctuation, rationale, and paragraphing.
+    context: chat
+    input: |
+      Hey, um, I took another look at this and I think we should probably start with
+      the skill rather than building speech dot lobot dot dev. Actually, don't say
+      probably. Say I think we should start with the skill because it tests the part
+      we actually care about, which is preserving intent rather than literal
+      transcription. New paragraph. We can always add the local infrastructure later
+      if the workflow proves useful.
+    expected: |
+      I took another look at this, and I think we should start with the skill rather than building speech.lobot.dev. It tests the part we actually care about: preserving intent rather than producing a literal transcription.
+
+      We can always add the local infrastructure later if the workflow proves useful.
+    invariants:
+      - '"Probably" is removed by explicit correction.'
+      - The domain is speech.lobot.dev.
+      - Preserving intent is the reason for starting with the skill.
+      - Local infrastructure remains a later option conditional on usefulness.
