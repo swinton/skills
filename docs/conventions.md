@@ -17,7 +17,17 @@ Each skill should:
 
 Frontmatter should contain a `name` matching the directory and a concrete `description` that states what the skill does and when it should trigger.
 
-Evaluation cases are behavioral documentation, not exact-match tests. Prefer representative inputs, reference outputs, and invariants that identify meaning which must not change.
+Evaluation cases are behavioral documentation and model-graded regression tests, not exact-match tests. Every case in `evals/cases.yaml` must contain:
+
+- A unique lowercase kebab-case `id`.
+- A concise `description`.
+- A self-contained `prompt` that can be sent to the installed skill.
+- A representative `expected` response.
+- Non-empty `invariants` describing behavior and meaning that must hold.
+
+The invariants are authoritative; wording may differ from the reference output. Keep tool-dependent cases deterministic by expressing external results as fixtures in the prompt. Live authenticated integration checks belong outside required pull-request CI.
+
+Stable-skill eval failures block CI after one automatic retry. Eval failures for skills containing `EXPERIMENTAL.md` are visible but non-blocking by default. Run `./scripts/eval --all --strict-experimental` before graduating an experimental skill.
 
 ## Experimental status
 

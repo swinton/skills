@@ -65,8 +65,31 @@ for path in "$SKILLS_DIR"/*; do
   if [ -d "$path/evals" ]; then
     for yaml in "$path"/evals/*.yaml "$path"/evals/*.yml; do
       [ -f "$yaml" ] || continue
-      if ! ruby -ryaml -e 'YAML.safe_load(File.read(ARGV.fetch(0)), permitted_classes: [], aliases: false)' "$yaml" 2>/dev/null; then
-        fail "$name: invalid YAML in ${yaml#$REPO_ROOT/}"
+      if ! ruby -ryaml -e '
+        file = ARGV.fetch(0)
+        document = YAML.safe_load(File.read(file), permitted_classes: [], aliases: false)
+        abort "document must be a mapping" unless document.is_a?(Hash)
+        cases = document["cases"]
+        abort "cases must be a non-empty list" unless cases.is_a?(Array) && !cases.empty?
+        ids = {}
+        cases.each_with_index do |entry, index|
+          abort "case #{index + 1} must be a mapping" unless entry.is_a?(Hash)
+          %w[id description prompt expected invariants].each do |key|
+            value = entry[key]
+            abort "case #{index + 1}: missing #{key}" if value.nil?
+            abort "case #{index + 1}: empty #{key}" if value.respond_to?(:empty?) && value.empty?
+          end
+          abort "case #{index + 1}: invariants must be a non-empty list of strings" unless
+            entry["invariants"].is_a?(Array) &&
+            entry["invariants"].all? { |item| item.is_a?(String) && !item.empty? }
+          id = entry["id"]
+          abort "case #{index + 1}: id must use lowercase kebab-case" unless
+            id.is_a?(String) && id.match?(/\A[a-z0-9]+(?:-[a-z0-9]+)*\z/)
+          abort "duplicate case id #{id.inspect}" if ids[id]
+          ids[id] = true
+        end
+      ' "$yaml" 2>/dev/null; then
+        fail "$name: invalid evaluation schema in ${yaml#$REPO_ROOT/}"
       fi
     done
   fi

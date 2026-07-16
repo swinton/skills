@@ -1,6 +1,9 @@
 cases:
   - id: complete-profile
     description: Summarizes useful fields from a populated user response.
+    prompt: |
+      Use this fixture as the result of `gh api user` and return the identity summary:
+      {"login":"octocat","name":"The Octocat","html_url":"https://github.com/octocat","type":"User","site_admin":false,"location":"San Francisco","company":"GitHub","bio":"A fictional GitHub mascot.","created_at":"2011-01-25T18:44:36Z"}
     input:
       login: octocat
       name: The Octocat
@@ -27,6 +30,9 @@ cases:
 
   - id: sparse-profile
     description: Omits optional fields that are empty.
+    prompt: |
+      Use this fixture as the result of `gh api user` and return the identity summary:
+      {"login":"example-user","name":null,"html_url":"https://github.com/example-user","type":"User","site_admin":false,"location":null,"company":null,"bio":null,"created_at":"2024-02-03T12:00:00Z"}
     input:
       login: example-user
       name:
@@ -48,6 +54,9 @@ cases:
 
   - id: site-admin
     description: Reports site administrator status only when true.
+    prompt: |
+      Use this fixture as the result of `gh api user` and return the identity summary:
+      {"login":"admin-user","name":"Admin User","html_url":"https://github.com/admin-user","type":"User","site_admin":true,"created_at":"2012-06-01T00:00:00Z"}
     input:
       login: admin-user
       name: Admin User
@@ -67,6 +76,9 @@ cases:
 
   - id: authentication-failure
     description: Does not guess an identity when the API request fails.
+    prompt: |
+      Use this fixture as the result of `gh api user` and handle the failure:
+      {"error":"HTTP 401 Requires authentication"}
     input:
       error: HTTP 401 Requires authentication
     expected: |
@@ -75,4 +87,3 @@ cases:
       - No GitHub identity is guessed.
       - The response suggests gh auth status.
       - No token value or credential location is requested or displayed.
-

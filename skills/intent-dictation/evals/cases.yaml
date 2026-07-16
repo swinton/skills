@@ -1,6 +1,9 @@
 cases:
   - id: remove-fillers
     description: Removes filler words without changing meaning.
+    prompt: |
+      This is a chat message. Return only the polished text:
+      hey um I think we should probably move the meeting to Thursday because Tuesday is going to be difficult
     context: chat
     input: |
       hey um I think we should probably move the meeting to Thursday
@@ -14,6 +17,9 @@ cases:
 
   - id: repeated-phrase
     description: Removes accidental repetition.
+    prompt: |
+      This is a chat message. Return only the polished text:
+      I reviewed the draft the draft and the permissions section looks good
     context: chat
     input: |
       I reviewed the draft the draft and the permissions section looks good
@@ -25,6 +31,9 @@ cases:
 
   - id: false-start
     description: Resolves an abandoned sentence start.
+    prompt: |
+      This is an email. Return only the polished text:
+      The launch plan is no wait the main risk in the launch plan is the migration window
     context: email
     input: |
       The launch plan is no wait the main risk in the launch plan is the migration window
@@ -36,6 +45,9 @@ cases:
 
   - id: spoken-correction
     description: Applies a direct correction.
+    prompt: |
+      This is a chat message. Return only the polished text:
+      Let's meet Tuesday change Tuesday to Thursday at 2 PM
     context: chat
     input: |
       Let's meet Tuesday change Tuesday to Thursday at 2 PM
@@ -47,6 +59,9 @@ cases:
 
   - id: scratch-that
     description: Removes discarded content.
+    prompt: |
+      This is a chat message. Return only the polished text:
+      I'll send the report tonight scratch that I'll send it tomorrow morning
     context: chat
     input: |
       I'll send the report tonight scratch that I'll send it tomorrow morning
@@ -58,6 +73,9 @@ cases:
 
   - id: paragraph-creation
     description: Applies a spoken paragraph break.
+    prompt: |
+      This is a document. Return only the polished text:
+      The pilot will focus on preserving intent rather than literal transcription. New paragraph. We can consider local speech infrastructure after the workflow proves useful.
     context: document
     input: |
       The pilot will focus on preserving intent rather than literal transcription.
@@ -72,6 +90,9 @@ cases:
 
   - id: bullet-list
     description: Converts spoken list structure into bullets.
+    prompt: |
+      These are notes. Return only the polished text:
+      We need three things bullet list preserve SARIF output validate the OpenAPI document and update Passport
     context: notes
     input: |
       We need three things bullet list preserve SARIF output validate the OpenAPI document and update Passport
@@ -87,6 +108,9 @@ cases:
 
   - id: preserve-uncertainty
     description: Does not turn a tentative estimate into a commitment.
+    prompt: |
+      This is a chat message. Return only the polished text:
+      I think I can probably finish the review by Friday
     context: chat
     input: |
       I think I can probably finish the review by Friday
@@ -98,6 +122,9 @@ cases:
 
   - id: preserve-shell-command
     description: Protects a corrected shell command.
+    prompt: |
+      These are notes. Return only the polished text:
+      Run uv sink scratch that uv sync and then git status
     context: notes
     input: |
       Run uv sink scratch that uv sync and then git status
@@ -109,6 +136,9 @@ cases:
 
   - id: preserve-domain
     description: Converts spoken domain punctuation without changing the domain.
+    prompt: |
+      This is a chat message. Return only the polished text:
+      I don't think we should build speech dot lobot dot dev yet
     context: chat
     input: |
       I don't think we should build speech dot lobot dot dev yet
@@ -120,6 +150,9 @@ cases:
 
   - id: preserve-product-name
     description: Preserves a technical product name.
+    prompt: |
+      This is a document. Return only the polished text:
+      Claude code should use the unified test results from the test API
     context: document
     input: |
       Claude code should use the unified test results from the test API
@@ -131,6 +164,9 @@ cases:
 
   - id: avoid-semantic-drift
     description: Does not strengthen a recommendation.
+    prompt: |
+      This is an email. Return only the polished text:
+      My initial view is that this might be worth testing with a small group before we commit
     context: email
     input: |
       My initial view is that this might be worth testing with a small group before we commit
@@ -143,6 +179,9 @@ cases:
 
   - id: concise-slack
     description: Produces a concise Slack message while preserving rationale.
+    prompt: |
+      This is a Slack message. Return only the polished text:
+      hey just wanted to say I took another look and I think we should start with the skill because that's the part that actually tests whether this is useful
     context: chat
     input: |
       hey just wanted to say I took another look and I think we should start with the skill
@@ -155,6 +194,9 @@ cases:
 
   - id: structured-codex-prompt
     description: Structures a dictated implementation prompt without weakening constraints.
+    prompt: |
+      This is a Codex prompt. Return only the polished text:
+      Ask Codex to update the install script new paragraph requirements bullet list keep it POSIX shell refuse to overwrite existing directories and run the validation script when done
     context: prompt
     input: |
       Ask Codex to update the install script new paragraph requirements bullet list keep it POSIX shell
@@ -174,6 +216,9 @@ cases:
 
   - id: material-uncertainty-marker
     description: Marks an uncertain security-sensitive filename rather than guessing.
+    prompt: |
+      These are notes. Return only the polished text:
+      Rotate the token in secrets slash prod dash off dot env I think that's the filename
     context: notes
     input: |
       Rotate the token in secrets slash prod dash off dot env I think that's the filename
@@ -186,6 +231,9 @@ cases:
 
   - id: first-manual-test
     description: Applies correction, domain punctuation, rationale, and paragraphing.
+    prompt: |
+      This is a chat message. Return only the polished text:
+      Hey, um, I took another look at this and I think we should probably start with the skill rather than building speech dot lobot dot dev. Actually, don't say probably. Say I think we should start with the skill because it tests the part we actually care about, which is preserving intent rather than literal transcription. New paragraph. We can always add the local infrastructure later if the workflow proves useful.
     context: chat
     input: |
       Hey, um, I took another look at this and I think we should probably start with

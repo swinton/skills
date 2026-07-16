@@ -1,0 +1,220 @@
+#!/usr/bin/env ruby
+
+require "fileutils"
+require "json"
+require "open3"
+require "optparse"
+require "tmpdir"
+require "yaml"
+
+ROOT = File.expand_path("..", __dir__)
+SKILLS_DIR = File.join(ROOT, "skills")
+CLAUDE = ENV.fetch("CLAUDE_BIN", "claude")
+MODEL = ENV.fetch("EVAL_MODEL", "claude-sonnet-5")
+MAX_BUDGET = ENV.fetch("EVAL_MAX_BUDGET_USD", "1.00")
+
+options = {
+  all: false,
+  skill: nil,
+  case_id: nil,
+  dry_run: false,
+  strict_experimental: false,
+  output: ENV["EVAL_OUTPUT"],
+  junit: ENV["EVAL_JUNIT"]
+}
+
+OptionParser.new do |parser|
+  parser.banner = "Usage: ./scripts/eval [--all | --skill NAME] [options]"
+  parser.on("--all", "Evaluate every skill") { options[:all] = true }
+  parser.on("--skill NAME", "Evaluate one skill") { |name| options[:skill] = name }
+  parser.on("--case ID", "Evaluate one case ID") { |id| options[:case_id] = id }
+  parser.on("--dry-run", "List selected cases without calling Claude") { options[:dry_run] = true }
+  parser.on("--strict-experimental", "Make experimental failures blocking") { options[:strict_experimental] = true }
+  parser.on("--output PATH", "Write JSON results to PATH") { |path| options[:output] = path }
+  parser.on("--junit PATH", "Write JUnit XML results to PATH") { |path| options[:junit] = path }
+  parser.on("-h", "--help", "Show this help") { puts parser; exit }
+end.parse!
+
+abort "error: choose either --all or --skill NAME" if options[:all] == !!options[:skill]
+
+def load_cases(skill)
+  path = File.join(SKILLS_DIR, skill, "evals", "cases.yaml")
+  return [] unless File.file?(path)
+  document = YAML.safe_load(File.read(path), permitted_classes: [], permitted_symbols: [], aliases: false)
+  document.fetch("cases")
+end
+
+def extract_result(stdout)
+  parsed = JSON.parse(stdout)
+  return stdout unless parsed.is_a?(Hash) && parsed.key?("result")
+  result = parsed.fetch("result")
+  result.is_a?(String) ? result : JSON.generate(result)
+rescue JSON::ParserError
+  stdout
+end
+
+def run_claude(prompt, home:, schema: nil)
+  command = [
+    CLAUDE, "--bare", "-p", "--no-session-persistence", "--tools", "",
+    "--model", MODEL, "--max-budget-usd", MAX_BUDGET, "--output-format", "json"
+  ]
+  command.concat(["--json-schema", JSON.generate(schema)]) if schema
+  stdout, stderr, status = Open3.capture3({"HOME" => home}, *command, stdin_data: prompt)
+  raise "Claude failed (#{status.exitstatus}): #{stderr.strip}" unless status.success?
+  extract_result(stdout)
+end
+
+def candidate_prompt(skill, kase)
+  <<~PROMPT
+    /#{skill}
+
+    #{kase.fetch("prompt")}
+  PROMPT
+end
+
+def judge_prompt(skill, kase, candidate)
+  <<~PROMPT
+    Evaluate this candidate output for the #{skill} skill.
+
+    Case: #{kase.fetch("description")}
+
+    User prompt:
+    #{kase.fetch("prompt")}
+
+    Reference output (wording may differ):
+    #{kase.fetch("expected")}
+
+    Required invariants:
+    #{kase.fetch("invariants").map { |item| "- #{item}" }.join("\n")}
+
+    Candidate output:
+    #{candidate}
+
+    Mark pass true only if every invariant is satisfied and the candidate introduces no material contradiction, unsafe side effect, invented fact, or prohibited disclosure. Judge behavior and meaning, not exact wording.
+  PROMPT
+end
+
+judge_schema = {
+  "type" => "object",
+  "properties" => {
+    "pass" => {"type" => "boolean"},
+    "reason" => {"type" => "string"},
+    "failed_invariants" => {"type" => "array", "items" => {"type" => "string"}}
+  },
+  "required" => ["pass", "reason", "failed_invariants"],
+  "additionalProperties" => false
+}
+
+skills = if options[:all]
+  Dir.children(SKILLS_DIR).select { |name| File.directory?(File.join(SKILLS_DIR, name)) }.sort
+else
+  [options[:skill]]
+end
+
+selected = skills.flat_map do |skill|
+  abort "error: unknown skill: #{skill}" unless File.file?(File.join(SKILLS_DIR, skill, "SKILL.md"))
+  load_cases(skill).each_with_object([]) do |kase, cases|
+    next if options[:case_id] && kase["id"] != options[:case_id]
+    cases << [skill, kase]
+  end
+end
+
+abort "error: no evaluation cases selected" if selected.empty?
+
+if options[:dry_run]
+  selected.each { |skill, kase| puts "#{skill}/#{kase.fetch("id")}" }
+  puts "#{selected.length} case(s)"
+  exit
+end
+
+results = []
+Dir.mktmpdir("skills-eval-") do |directory|
+  home = File.join(directory, "home")
+  target = File.join(home, ".claude", "skills")
+  FileUtils.mkdir_p(home)
+  install_out, install_err, install_status = Open3.capture3(
+    File.join(ROOT, "scripts", "install"), "--all", "--include-experimental", "--target", target
+  )
+  abort "error: isolated skill installation failed: #{install_err}#{install_out}" unless install_status.success?
+
+  selected.each_with_index do |(skill, kase), index|
+    experimental = File.file?(File.join(SKILLS_DIR, skill, "EXPERIMENTAL.md"))
+    label = "#{skill}/#{kase.fetch("id")}"
+    puts "[#{index + 1}/#{selected.length}] #{label}"
+    attempts = []
+
+    2.times do |attempt|
+      begin
+        candidate = run_claude(candidate_prompt(skill, kase), home: home)
+        judgement_text = run_claude(judge_prompt(skill, kase, candidate), home: home, schema: judge_schema)
+        judgement = JSON.parse(judgement_text)
+        attempts << {
+          "attempt" => attempt + 1,
+          "candidate" => candidate,
+          "pass" => judgement.fetch("pass"),
+          "reason" => judgement.fetch("reason"),
+          "failed_invariants" => judgement.fetch("failed_invariants")
+        }
+        break if judgement.fetch("pass")
+      rescue StandardError => error
+        attempts << {"attempt" => attempt + 1, "pass" => false, "error" => error.message}
+      end
+    end
+
+    passed = attempts.any? { |attempt| attempt["pass"] }
+    flaky = passed && attempts.length > 1
+    infrastructure_error = !passed && attempts.all? { |attempt| attempt.key?("error") }
+    blocking = infrastructure_error || !experimental || options[:strict_experimental]
+    results << {
+      "skill" => skill,
+      "case" => kase.fetch("id"),
+      "experimental" => experimental,
+      "blocking" => blocking,
+      "infrastructure_error" => infrastructure_error,
+      "pass" => passed,
+      "flaky" => flaky,
+      "attempts" => attempts
+    }
+    puts "#{passed ? "PASS" : "FAIL"}#{flaky ? " (retry)" : ""}#{experimental ? " (experimental)" : ""}: #{label}"
+  end
+end
+
+summary = {
+  "model" => MODEL,
+  "total" => results.length,
+  "passed" => results.count { |result| result["pass"] },
+  "failed" => results.count { |result| !result["pass"] },
+  "blocking_failures" => results.count { |result| !result["pass"] && result["blocking"] },
+  "infrastructure_failures" => results.count { |result| result["infrastructure_error"] },
+  "flaky" => results.count { |result| result["flaky"] },
+  "results" => results
+}
+
+json = JSON.pretty_generate(summary)
+if options[:output]
+  FileUtils.mkdir_p(File.dirname(File.expand_path(options[:output])))
+  File.write(options[:output], "#{json}\n")
+end
+if options[:junit]
+  escape = ->(text) {
+    text.to_s.gsub("&", "&amp;").gsub("<", "&lt;").gsub(">", "&gt;").gsub('"', "&quot;")
+  }
+  testcases = results.map do |result|
+    failure = if !result["pass"] && result["blocking"]
+      last = result["attempts"].last || {}
+      %(<failure message="#{escape.call(last["reason"] || last["error"] || "evaluation failed")}">#{escape.call(JSON.pretty_generate(last))}</failure>)
+    elsif !result["pass"]
+      %(<system-out>Experimental non-blocking failure: #{escape.call(JSON.pretty_generate(result["attempts"]))}</system-out>)
+    elsif result["flaky"]
+      %(<system-out>Passed after retry</system-out>)
+    else
+      ""
+    end
+    %(<testcase classname="#{escape.call(result["skill"])}" name="#{escape.call(result["case"])}">#{failure}</testcase>)
+  end.join("\n")
+  xml = %(<?xml version="1.0" encoding="UTF-8"?>\n<testsuite name="skill-evals" tests="#{summary["total"]}" failures="#{summary["blocking_failures"]}">\n#{testcases}\n</testsuite>\n)
+  FileUtils.mkdir_p(File.dirname(File.expand_path(options[:junit])))
+  File.write(options[:junit], xml)
+end
+puts json
+exit(summary["blocking_failures"].zero? ? 0 : 1)

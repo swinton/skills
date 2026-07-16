@@ -1,5 +1,6 @@
 .DS_Store
 .sync-state.json
+__pycache__/
 dist/
 *.swp
 *.tmp
